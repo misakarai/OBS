@@ -43,6 +43,11 @@
     width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
     font-family:var(--mono);font-size:12.5px;padding:8px 10px;border-radius:5px;margin-top:6px;
   }
+  .checkbox-row{
+    display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+    color:var(--text-dim);letter-spacing:.02em;margin-top:14px;
+  }
+  .checkbox-row input{width:16px;height:16px;accent-color:var(--amber);}
   #status{
     font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:12px;line-height:1.6;
   }
@@ -62,6 +67,8 @@
   <label>使用するカメラ</label>
   <select id="deviceSelect"><option value="">自動(スマホは背面カメラ優先)</option></select>
   <button id="refreshBtn" type="button" class="secondary">カメラ一覧を更新</button>
+
+  <label class="checkbox-row"><input type="checkbox" id="audioToggle"> マイクの音声も一緒に送信する</label>
 
   <button id="startBtn" type="button">① カメラを開始</button>
 
@@ -182,10 +189,19 @@
     try{
       const deviceId = $('deviceSelect').value;
       const videoConstraint = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' };
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraint,
-        audio: false
-      });
+      const wantAudio = $('audioToggle').checked;
+      let stream;
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: wantAudio });
+      }catch(err){
+        if(wantAudio){
+          setStatus('マイクが使えなかったため、映像のみで起動します…');
+          stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: false });
+          $('audioToggle').checked = false;
+        }else{
+          throw err;
+        }
+      }
       $('preview').srcObject = stream;
       await listDevices(); // labels are now available after permission was granted
 

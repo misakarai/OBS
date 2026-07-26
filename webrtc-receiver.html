@@ -12,19 +12,36 @@
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;background:var(--bg-deep);color:var(--text);font-family:var(--sans);}
-  body{padding:20px 16px 40px;max-width:520px;margin:0 auto;}
-  h1{font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--amber);margin:0 0 4px;}
-  video{
-    width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;
-    border:1px solid var(--border);object-fit:cover;margin-top:14px;
+  html,body{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;
+    font-family:var(--sans);color:var(--text);}
+
+  #video{
+    position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000;
   }
+
+  #gearBtn{
+    position:fixed;top:12px;right:12px;z-index:5;
+    width:34px;height:34px;border-radius:50%;border:1px solid var(--border);
+    background:rgba(21,24,28,0.8);color:var(--text-dim);cursor:pointer;
+    font-size:15px;display:none;align-items:center;justify-content:center;
+  }
+  #gearBtn:hover{color:var(--amber);border-color:var(--amber);}
+
+  #setupPane{
+    position:fixed;inset:0;z-index:4;background:rgba(11,13,16,0.92);
+    display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;
+  }
+  #setupCard{
+    width:100%;max-width:480px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;padding:22px 24px 26px;
+  }
+  h1{font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--amber);margin:0 0 16px;}
   label{
     display:block;font-family:var(--mono);font-size:11px;color:var(--text-dim);
     letter-spacing:.05em;margin:16px 0 6px;
   }
   textarea{
-    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
+    width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text);
     font-family:var(--mono);font-size:11px;border-radius:5px;padding:8px;resize:vertical;
   }
   button{
@@ -32,28 +49,33 @@
     padding:10px 16px;border-radius:5px;border:1px solid var(--tally-red);
     background:var(--tally-red);color:#fff;cursor:pointer;margin-top:10px;margin-right:6px;
   }
-  button.secondary{background:var(--panel);border-color:var(--border);color:var(--text);}
+  button.secondary{background:var(--bg-deep);border-color:var(--border);color:var(--text);}
   #status{
-    font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:12px;line-height:1.6;
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:14px;line-height:1.6;
   }
   #status.error{color:var(--tally-red);}
   #status.ok{color:var(--amber);}
 </style>
 </head>
 <body>
-  <h1>WebRTC 受信(PC / OBS側)</h1>
-
-  <label>①スマホからもらったコードを貼り付け</label>
-  <textarea id="offerIn" rows="4" placeholder="スマホ側で生成されたコードを貼り付け"></textarea>
-  <button id="answerBtn" type="button">② 応答を作成</button>
-
-  <label>③スマホへ渡すコード</label>
-  <textarea id="answerOut" rows="4" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
-  <button id="copyAnswerBtn" type="button" class="secondary">コピー</button>
-
   <video id="video" autoplay playsinline></video>
+  <button id="gearBtn" title="設定を開く">⚙</button>
 
-  <div id="status">スマホ側で先にカメラを開始し、コードを受け取ってから①に貼り付けてください。</div>
+  <div id="setupPane">
+    <div id="setupCard">
+      <h1>WebRTC 受信(PC / OBS側)</h1>
+
+      <label>①スマホからもらったコードを貼り付け</label>
+      <textarea id="offerIn" rows="4" placeholder="スマホ側で生成されたコードを貼り付け"></textarea>
+      <button id="answerBtn" type="button">② 応答を作成</button>
+
+      <label>③スマホへ渡すコード</label>
+      <textarea id="answerOut" rows="4" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
+      <button id="copyAnswerBtn" type="button" class="secondary">コピー</button>
+
+      <div id="status">スマホ側で先にカメラを開始し、コードを受け取ってから①に貼り付けてください。</div>
+    </div>
+  </div>
 
 <script>
 (function(){
@@ -130,6 +152,8 @@
       pc.ontrack = (e) => {
         $('video').srcObject = e.streams[0];
         setStatus('映像を受信しました。このページをOBSのブラウザソースとして追加してください。', 'ok');
+        $('setupPane').style.display = 'none';
+        $('gearBtn').style.display = 'flex';
       };
 
       await pc.setRemoteDescription(offer);
@@ -150,6 +174,10 @@
     ta.select();
     try{ await navigator.clipboard.writeText(ta.value); }catch(e){ document.execCommand('copy'); }
     setStatus('コピーしました。スマホ側に貼り付けてもらってください。');
+  });
+
+  $('gearBtn').addEventListener('click', () => {
+    $('setupPane').style.display = 'flex';
   });
 })();
 </script>
