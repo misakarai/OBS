@@ -186,6 +186,63 @@
     .pgm-readout{font-size:16px;}
     .legend{margin-left:0;}
   }
+
+  /* ---- WebRTC phone camera panel ---- */
+  .webrtc-panel{
+    margin:0 20px 14px;border:1px solid var(--border);border-radius:6px;
+    background:var(--panel);
+  }
+  .webrtc-panel summary{
+    cursor:pointer;padding:11px 14px;font-family:var(--mono);font-size:12px;
+    letter-spacing:.04em;color:var(--text-dim);list-style:none;
+    display:flex;align-items:center;gap:8px;
+  }
+  .webrtc-panel summary::-webkit-details-marker{display:none;}
+  .webrtc-panel summary::before{content:'▸';color:var(--amber);}
+  .webrtc-panel[open] summary::before{content:'▾';}
+  .webrtc-panel summary:hover{color:var(--text);}
+  .webrtc-body{padding:0 16px 16px;}
+  .webrtc-note{
+    font-size:12px;color:var(--text-dim);line-height:1.6;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:4px;
+    padding:10px 12px;margin:0 0 14px;
+  }
+  .webrtc-note strong{color:var(--amber);}
+  .webrtc-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+  .wr-tab{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+    padding:7px 12px;border-radius:4px;border:1px solid var(--border);
+    background:var(--panel-2);color:var(--text-dim);cursor:pointer;
+  }
+  .wr-tab.active{border-color:var(--amber);color:var(--amber);background:rgba(240,168,60,0.08);}
+  .wr-pane{display:none;}
+  .wr-pane.active{display:block;}
+  .wr-steps{
+    font-size:12px;color:var(--text-dim);line-height:1.8;margin:0 0 12px;padding-left:18px;
+  }
+  .wr-pane label{
+    display:block;font-family:var(--mono);font-size:11px;color:var(--text-dim);
+    letter-spacing:.06em;margin:10px 0 5px;
+  }
+  .wr-pane textarea{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:11px;border-radius:4px;padding:8px;resize:vertical;
+  }
+  .wr-pane button{
+    font-family:var(--mono);font-size:12px;letter-spacing:.05em;font-weight:600;
+    padding:8px 14px;border-radius:4px;border:1px solid var(--border);
+    background:var(--panel-2);color:var(--text);cursor:pointer;margin-top:8px;margin-right:6px;
+  }
+  .wr-pane button:hover{border-color:var(--amber);color:var(--amber);}
+  .wr-pane video{
+    width:100%;max-width:320px;background:#000;border-radius:4px;margin-top:10px;display:block;
+    aspect-ratio:16/9;object-fit:cover;
+  }
+  .wr-status{
+    font-family:var(--mono);font-size:11.5px;color:var(--text-dim);margin-top:10px;letter-spacing:.02em;
+  }
+  .wr-status.error{color:var(--tally-red);}
+  .wr-status.ok{color:var(--amber);}
 </style>
 </head>
 <body>
@@ -219,6 +276,54 @@
       <span><span class="swatch pip"></span>PIP(右下に重ねる)</span>
     </div>
   </div>
+
+  <details class="webrtc-panel" id="webrtcPanel">
+    <summary>📱 スマホカメラを取り込む(WebRTC・手動シグナリング)</summary>
+    <div class="webrtc-body">
+      <p class="webrtc-note">
+        スマホでカメラを使うには、このページを<strong>HTTPS</strong>で開く必要があります(<code>file://</code>や<code>http://192.168.x.x</code>ではカメラ許可が出ません)。
+        PCで簡易HTTPSサーバーを立てるか、ngrok等のトンネル経由でこのファイルを公開してください。サーバーは使わず、下のコードを手動でコピー&ペーストして1回だけ接続します。
+      </p>
+      <div class="webrtc-tabs">
+        <button type="button" class="wr-tab active" data-pane="phonePane">① スマホ側(送信)</button>
+        <button type="button" class="wr-tab" data-pane="receiverPane">② PC側(受信・OBSソース用)</button>
+      </div>
+
+      <div id="phonePane" class="wr-pane active">
+        <ol class="wr-steps">
+          <li>このページをスマホのブラウザ(HTTPS)で開く</li>
+          <li>「カメラを開始」を押して許可する</li>
+          <li>下に出るコードをコピーし、PC側(②)に貼り付けてもらう</li>
+          <li>PC側からもらったコードを下の欄に貼り付けて「接続を完了」</li>
+        </ol>
+        <video id="phonePreview" autoplay playsinline muted></video>
+        <button type="button" id="phoneStartBtn">カメラを開始</button>
+        <label>①→PCへ渡すコード</label>
+        <textarea id="phoneOfferOut" rows="3" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
+        <button type="button" class="copy-btn" data-target="phoneOfferOut">コピー</button>
+        <label>PCからもらったコードを貼り付け</label>
+        <textarea id="phoneAnswerIn" rows="3" placeholder="PC側(②)で生成されたコードを貼り付け"></textarea>
+        <button type="button" id="phoneCompleteBtn">接続を完了</button>
+        <div class="wr-status" id="phoneStatus"></div>
+      </div>
+
+      <div id="receiverPane" class="wr-pane">
+        <ol class="wr-steps">
+          <li>スマホ側(①)からもらったコードを下に貼り付け、「応答を作成」</li>
+          <li>出てきたコードをスマホに渡して貼り付けてもらう</li>
+          <li>下に映像が表示されたら、このページ全体をOBSの「ブラウザソース」として対象シーンに追加(ソース名は任意、例: PhoneCam)。追加後は上のソース一覧に通常のカメラと同様に表示され、メイン/PIP切り替えが使えます</li>
+        </ol>
+        <label>①スマホからもらったコードを貼り付け</label>
+        <textarea id="receiverOfferIn" rows="3" placeholder="スマホ側(①)で生成されたコードを貼り付け"></textarea>
+        <button type="button" id="receiverAnswerBtn">応答を作成</button>
+        <label>スマホへ渡すコード</label>
+        <textarea id="receiverAnswerOut" rows="3" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
+        <button type="button" class="copy-btn" data-target="receiverAnswerOut">コピー</button>
+        <video id="receiverVideo" autoplay playsinline></video>
+        <div class="wr-status" id="receiverStatus"></div>
+      </div>
+    </div>
+  </details>
 
   <div class="status-line" id="statusLine">未接続 — OBSの「ツール > WebSocketサーバー設定」を有効にしてから接続してください。</div>
 
@@ -652,6 +757,133 @@
 
   connectBtn.addEventListener('click', connect);
   disconnectBtn.addEventListener('click', disconnect);
+})();
+</script>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+  // ---- tab switching ----
+  document.querySelectorAll('.wr-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.wr-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.wr-pane').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      $(tab.dataset.pane).classList.add('active');
+    });
+  });
+
+  // ---- copy buttons ----
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ta = $(btn.dataset.target);
+      ta.select();
+      try{
+        await navigator.clipboard.writeText(ta.value);
+      }catch(e){
+        document.execCommand('copy');
+      }
+      const original = btn.textContent;
+      btn.textContent = 'コピーしました';
+      setTimeout(() => { btn.textContent = original; }, 1200);
+    });
+  });
+
+  function waitIceComplete(pc){
+    return new Promise(resolve => {
+      if(pc.iceGatheringState === 'complete'){ resolve(); return; }
+      function check(){
+        if(pc.iceGatheringState === 'complete'){
+          pc.removeEventListener('icegatheringstatechange', check);
+          resolve();
+        }
+      }
+      pc.addEventListener('icegatheringstatechange', check);
+    });
+  }
+
+  function setStatus(el, msg, kind){
+    el.textContent = msg;
+    el.classList.remove('error', 'ok');
+    if(kind) el.classList.add(kind);
+  }
+
+  // ---- phone (sender) side ----
+  let phonePc = null;
+  const phoneStatus = $('phoneStatus');
+
+  $('phoneStartBtn').addEventListener('click', async () => {
+    if(!window.isSecureContext){
+      setStatus(phoneStatus, 'このページは安全な接続(HTTPS)で開かれていません。カメラ許可が出せないため、まずHTTPSで開き直してください。', 'error');
+      return;
+    }
+    try{
+      setStatus(phoneStatus, 'カメラを起動しています…');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      });
+      $('phonePreview').srcObject = stream;
+
+      phonePc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      stream.getTracks().forEach(track => phonePc.addTrack(track, stream));
+
+      const offer = await phonePc.createOffer();
+      await phonePc.setLocalDescription(offer);
+      setStatus(phoneStatus, '接続情報を作成しています…');
+      await waitIceComplete(phonePc);
+
+      $('phoneOfferOut').value = JSON.stringify(phonePc.localDescription);
+      setStatus(phoneStatus, '上のコードをPC側(②)にコピーして渡してください。', 'ok');
+    }catch(err){
+      setStatus(phoneStatus, 'カメラ起動に失敗しました: ' + err.message, 'error');
+    }
+  });
+
+  $('phoneCompleteBtn').addEventListener('click', async () => {
+    if(!phonePc){
+      setStatus(phoneStatus, '先に「カメラを開始」を押してください。', 'error');
+      return;
+    }
+    try{
+      const raw = $('phoneAnswerIn').value.trim();
+      const answer = JSON.parse(raw);
+      await phonePc.setRemoteDescription(answer);
+      setStatus(phoneStatus, '接続しました。PC側の映像を確認してください。', 'ok');
+    }catch(err){
+      setStatus(phoneStatus, 'コードの読み込みに失敗しました。PC側から渡されたコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
+    }
+  });
+
+  // ---- PC (receiver) side ----
+  let receiverPc = null;
+  const receiverStatus = $('receiverStatus');
+
+  $('receiverAnswerBtn').addEventListener('click', async () => {
+    try{
+      const raw = $('receiverOfferIn').value.trim();
+      const offer = JSON.parse(raw);
+
+      receiverPc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      receiverPc.ontrack = (e) => {
+        $('receiverVideo').srcObject = e.streams[0];
+        setStatus(receiverStatus, '映像を受信しました。このページをOBSのブラウザソースとして追加してください。', 'ok');
+      };
+
+      await receiverPc.setRemoteDescription(offer);
+      const answer = await receiverPc.createAnswer();
+      await receiverPc.setLocalDescription(answer);
+      setStatus(receiverStatus, '応答を作成しています…');
+      await waitIceComplete(receiverPc);
+
+      $('receiverAnswerOut').value = JSON.stringify(receiverPc.localDescription);
+      setStatus(receiverStatus, '上のコードをスマホ側(①)に渡して貼り付けてもらってください。');
+    }catch(err){
+      setStatus(receiverStatus, 'コードの読み込みに失敗しました。スマホ側から渡されたコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
+    }
+  });
 })();
 </script>
 </body>
