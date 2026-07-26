@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebRTC 送信(スマホ側)</title>
+<style>
+  :root{
+    --bg-deep:#0b0d10; --panel:#15181c; --border:#282e35;
+    --text:#e9e7e2; --text-dim:#7c838c; --amber:#f0a83c; --tally-red:#e6293b;
+    --mono:'SFMono-Regular','IBM Plex Mono','Consolas','Courier New',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg-deep);color:var(--text);font-family:var(--sans);}
+  body{padding:20px 16px 40px;max-width:480px;margin:0 auto;}
+  h1{font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--amber);margin:0 0 4px;}
+  .note{
+    font-size:12px;color:var(--text-dim);line-height:1.6;background:var(--panel);
+    border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin:12px 0;
+  }
+  .note strong{color:var(--amber);}
+  video{
+    width:100%;aspect-ratio:9/16;background:#000;border-radius:8px;
+    border:1px solid var(--border);object-fit:cover;margin-top:10px;
+  }
+  label{
+    display:block;font-family:var(--mono);font-size:11px;color:var(--text-dim);
+    letter-spacing:.05em;margin:16px 0 6px;
+  }
+  textarea{
+    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:11px;border-radius:5px;padding:8px;resize:vertical;
+  }
+  button{
+    font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.04em;
+    padding:10px 16px;border-radius:5px;border:1px solid var(--tally-red);
+    background:var(--tally-red);color:#fff;cursor:pointer;margin-top:10px;margin-right:6px;
+  }
+  button.secondary{background:var(--panel);border-color:var(--border);color:var(--text);}
+  button:disabled{opacity:.5;}
+  #status{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:12px;line-height:1.6;
+  }
+  #status.error{color:var(--tally-red);}
+  #status.ok{color:var(--amber);}
+</style>
+</head>
+<body>
+  <h1>WebRTC 送信(スマホ側)</h1>
+  <p class="note">
+    <strong>HTTPS</strong>で開く必要があります(file://や素のhttp://ではカメラ許可が出ません)。
+  </p>
+
+  <video id="preview" autoplay playsinline muted></video>
+
+  <button id="startBtn" type="button">① カメラを開始</button>
+
+  <label>②→PC側に渡すコード</label>
+  <textarea id="offerOut" rows="4" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
+  <button id="copyOfferBtn" type="button" class="secondary">コピー</button>
+
+  <label>③PC側からもらったコードを貼り付け</label>
+  <textarea id="answerIn" rows="4" placeholder="PC側で生成されたコードを貼り付け"></textarea>
+  <button id="completeBtn" type="button">④ 接続を完了</button>
+
+  <div id="status">準備完了。①から順に進めてください。</div>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $('status');
+  let pc = null;
+
+  function setStatus(text, kind){
+    statusEl.textContent = text;
+    statusEl.classList.remove('error', 'ok');
+    if(kind) statusEl.classList.add(kind);
+  }
+
+  function waitIceComplete(peer){
+    return new Promise(resolve => {
+      if(peer.iceGatheringState === 'complete'){ resolve(); return; }
+      function check(){
+        if(peer.iceGatheringState === 'complete'){
+          peer.removeEventListener('icegatheringstatechange', check);
+          resolve();
+        }
+      }
+      peer.addEventListener('icegatheringstatechange', check);
+    });
+  }
+
+  $('startBtn').addEventListener('click', async () => {
+    if(!window.isSecureContext){
+      setStatus('HTTPSで開かれていません。カメラ許可が出せないため開き直してください。', 'error');
+      return;
+    }
+    $('startBtn').disabled = true;
+    setStatus('カメラを起動しています…');
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      });
+      $('preview').srcObject = stream;
+
+      pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      setStatus('接続情報を作成しています…');
+      await waitIceComplete(pc);
+
+      $('offerOut').value = JSON.stringify(pc.localDescription);
+      setStatus('②のコードをコピーしてPC側に渡してください。', 'ok');
+    }catch(err){
+      setStatus('カメラ起動に失敗しました: ' + err.message, 'error');
+      $('startBtn').disabled = false;
+    }
+  });
+
+  $('copyOfferBtn').addEventListener('click', async () => {
+    const ta = $('offerOut');
+    ta.select();
+    try{ await navigator.clipboard.writeText(ta.value); }catch(e){ document.execCommand('copy'); }
+    setStatus('コピーしました。PC側に貼り付けてください。', 'ok');
+  });
+
+  $('completeBtn').addEventListener('click', async () => {
+    if(!pc){
+      setStatus('先に①「カメラを開始」を押してください。', 'error');
+      return;
+    }
+    try{
+      const answer = JSON.parse($('answerIn').value.trim());
+      await pc.setRemoteDescription(answer);
+      setStatus('接続しました。この画面を閉じずにそのままにしてください。', 'ok');
+    }catch(err){
+      setStatus('コードの読み込みに失敗しました。PC側のコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
+    }
+  });
+})();
+</script>
+</body>
+</html>

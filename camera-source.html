@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camera Source</title>
+<style>
+  :root{
+    --bg-deep:#0b0d10;
+    --panel:#15181c;
+    --border:#282e35;
+    --text:#e9e7e2;
+    --text-dim:#7c838c;
+    --amber:#f0a83c;
+    --tally-red:#e6293b;
+    --mono:'SFMono-Regular','IBM Plex Mono','Consolas','Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;
+    font-family:var(--mono);color:var(--text);
+  }
+  #video{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;
+  }
+
+  #picker{
+    position:absolute;inset:0;background:var(--bg-deep);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    padding:20px;text-align:center;
+  }
+  #picker h1{
+    font-size:13px;letter-spacing:.18em;color:var(--text-dim);margin:0;font-weight:600;
+  }
+  #deviceSelect{
+    background:var(--panel);border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:13px;padding:9px 12px;border-radius:5px;
+    max-width:360px;width:100%;
+  }
+  #startBtn{
+    font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.05em;
+    padding:10px 22px;border-radius:5px;border:1px solid var(--amber);
+    background:var(--amber);color:#1a1305;cursor:pointer;
+  }
+  #startBtn:disabled{opacity:.5;cursor:default;}
+  #refreshBtn{
+    font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+    padding:6px 12px;border-radius:5px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text-dim);cursor:pointer;
+  }
+  #msg{ font-size:11.5px;color:var(--text-dim);max-width:400px;line-height:1.6; }
+  #msg.error{ color:var(--tally-red); }
+
+  #gearBtn{
+    position:absolute;top:10px;right:10px;z-index:5;
+    width:30px;height:30px;border-radius:50%;border:1px solid var(--border);
+    background:rgba(21,24,28,0.75);color:var(--text-dim);cursor:pointer;
+    font-size:14px;display:flex;align-items:center;justify-content:center;
+  }
+  #gearBtn:hover{ color:var(--amber); border-color:var(--amber); }
+</style>
+</head>
+<body>
+  <video id="video" autoplay playsinline muted></video>
+
+  <button id="gearBtn" title="カメラを選び直す" style="display:none;">⚙</button>
+
+  <div id="picker">
+    <h1>カメラ映像ソース</h1>
+    <select id="deviceSelect"><option value="">カメラ一覧を読み込み中…</option></select>
+    <button id="refreshBtn" type="button">一覧を更新</button>
+    <button id="startBtn" type="button" disabled>このカメラを表示</button>
+    <div id="msg">カメラの使用許可を求められたら「許可」してください。</div>
+  </div>
+
+<script>
+(function(){
+  const picker = document.getElementById('picker');
+  const deviceSelect = document.getElementById('deviceSelect');
+  const startBtn = document.getElementById('startBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const gearBtn = document.getElementById('gearBtn');
+  const video = document.getElementById('video');
+  const msg = document.getElementById('msg');
+
+  let currentStream = null;
+
+  function setMsg(text, isError){
+    msg.textContent = text;
+    msg.classList.toggle('error', !!isError);
+  }
+
+  async function listDevices(){
+    try{
+      // Requesting a throwaway stream first so device labels are populated (labels are blank until permission is granted once).
+      if(!currentStream){
+        try{
+          const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+          tmp.getTracks().forEach(t => t.stop());
+        }catch(e){ /* user may deny; still try to list devices below */ }
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      deviceSelect.innerHTML = '';
+      if(!cams.length){
+        deviceSelect.innerHTML = '<option value="">カメラが見つかりません</option>';
+        startBtn.disabled = true;
+        return;
+      }
+      cams.forEach((cam, i) => {
+        const opt = document.createElement('option');
+        opt.value = cam.deviceId;
+        opt.textContent = cam.label || ('カメラ ' + (i + 1));
+        deviceSelect.appendChild(opt);
+      });
+      startBtn.disabled = false;
+      setMsg('カメラを選んで「このカメラを表示」を押してください。');
+    }catch(err){
+      setMsg('カメラ一覧の取得に失敗しました: ' + err.message, true);
+    }
+  }
+
+  async function startCamera(){
+    if(!window.isSecureContext){
+      setMsg('このページはHTTPS(またはlocalhost)で開かれていません。カメラ許可が出せません。', true);
+      return;
+    }
+    const deviceId = deviceSelect.value;
+    startBtn.disabled = true;
+    setMsg('起動しています…');
+    try{
+      if(currentStream){
+        currentStream.getTracks().forEach(t => t.stop());
+      }
+      currentStream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false
+      });
+      video.srcObject = currentStream;
+      picker.style.display = 'none';
+      gearBtn.style.display = 'flex';
+    }catch(err){
+      setMsg('カメラの起動に失敗しました: ' + err.message, true);
+      startBtn.disabled = false;
+    }
+  }
+
+  refreshBtn.addEventListener('click', listDevices);
+  startBtn.addEventListener('click', startCamera);
+  gearBtn.addEventListener('click', () => {
+    picker.style.display = 'flex';
+    gearBtn.style.display = 'none';
+    listDevices();
+  });
+
+  navigator.mediaDevices.addEventListener?.('devicechange', () => {
+    if(picker.style.display !== 'none') listDevices();
+  });
+
+  listDevices();
+})();
+</script>
+</body>
+</html>

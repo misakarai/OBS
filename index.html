@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MULTICAM SWITCH</title>
+<title>OBS Multicam Toolkit</title>
 <style>
   :root{
     --bg-deep:#0b0d10;
@@ -13,878 +13,125 @@
     --text:#e9e7e2;
     --text-dim:#7c838c;
     --tally-red:#e6293b;
-    --tally-red-glow:rgba(230,41,59,0.55);
     --amber:#f0a83c;
-    --amber-glow:rgba(240,168,60,0.45);
     --mono:'SFMono-Regular','IBM Plex Mono','Consolas','Courier New',monospace;
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{
-    margin:0;padding:0;background:var(--bg-deep);color:var(--text);
-    font-family:var(--sans);height:100%;
-  }
-  .app{ min-height:100vh; display:flex;flex-direction:column; }
+  html,body{margin:0;background:var(--bg-deep);color:var(--text);font-family:var(--sans);}
+  body{padding:40px 20px 60px;max-width:820px;margin:0 auto;}
 
-  .topbar{
-    display:flex;align-items:center;justify-content:space-between;
-    gap:16px;padding:14px 20px;
-    background:var(--panel);border-bottom:1px solid var(--border);
-    flex-wrap:wrap;
+  header{margin-bottom:36px;}
+  .kicker{
+    font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--amber);
+    font-weight:700;margin:0 0 10px;
   }
-  .brand{ display:flex;align-items:center;gap:10px; }
-  .brand .dot{
-    width:9px;height:9px;border-radius:50%;background:var(--text-dim);
-    box-shadow:0 0 0 3px rgba(255,255,255,0.03);
-    transition:background .2s, box-shadow .2s;
-  }
-  .brand .dot.live{background:var(--tally-red);box-shadow:0 0 10px 2px var(--tally-red-glow);}
-  .brand .dot.connecting{background:var(--amber);box-shadow:0 0 8px 2px var(--amber-glow);}
-  .brand h1{
-    font-family:var(--mono);font-size:13px;letter-spacing:.18em;
-    margin:0;color:var(--text-dim);font-weight:600;
-  }
-  .pgm-readout{
-    font-family:var(--mono);font-size:20px;letter-spacing:.04em;font-weight:700;
-    color:var(--tally-red); min-height:28px;
-  }
-  .pgm-readout .label{
-    font-size:10px;color:var(--text-dim);letter-spacing:.2em;display:block;font-weight:600;margin-bottom:2px;
-  }
-  .pgm-readout .pip-part{ color:var(--amber); font-size:15px; }
+  h1{font-size:26px;margin:0 0 10px;letter-spacing:-.01em;}
+  header p{color:var(--text-dim);font-size:14.5px;line-height:1.7;max-width:620px;margin:0;}
 
-  .conn-form{ display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
-  .conn-form input, .conn-form select{
-    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
-    font-family:var(--mono);font-size:12px;padding:7px 9px;border-radius:4px;
-    width:100px;
-  }
-  .conn-form input.wide, .conn-form select.wide{width:170px;}
-  .conn-form input:focus, .conn-form select:focus{outline:none;border-color:var(--amber);}
-  .conn-form button{
-    font-family:var(--mono);font-size:12px;letter-spacing:.08em;font-weight:600;
-    padding:8px 16px;border-radius:4px;border:1px solid var(--border);
-    background:var(--panel-2);color:var(--text);cursor:pointer;
-    transition:background .15s, border-color .15s;
-  }
-  .conn-form button:hover{border-color:var(--text-dim);}
-  .conn-form button.primary{background:var(--tally-red);border-color:var(--tally-red);color:#fff;}
-  .conn-form button.primary:hover{filter:brightness(1.08);}
-  .conn-form button:disabled{opacity:.4;cursor:default;}
-
-  .scene-bar{
-    display:flex;align-items:center;gap:10px;padding:10px 20px;
-    border-bottom:1px solid var(--border);flex-wrap:wrap;
-  }
-  .scene-bar label{
-    font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:.1em;
-  }
-  .legend{
-    display:flex;align-items:center;gap:14px;margin-left:auto;
-    font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
-  }
-  .legend span{ display:flex;align-items:center;gap:5px; }
-  .legend .swatch{ width:9px;height:9px;border-radius:2px; }
-  .legend .swatch.main{ background:var(--tally-red); }
-  .legend .swatch.pip{ background:var(--amber); }
-
-  .status-line{
-    padding:8px 20px;font-family:var(--mono);font-size:11.5px;color:var(--text-dim);
-    border-bottom:1px solid var(--border);letter-spacing:.02em;min-height:16px;
-  }
-  .status-line.error{color:var(--tally-red);}
-
-  .stage{
-    flex:1;padding:22px;display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
-    gap:16px;align-content:start;
-  }
-  .empty-state{
-    color:var(--text-dim);font-family:var(--mono);font-size:13px;
-    padding:60px 0;text-align:center;grid-column:1/-1;letter-spacing:.03em;
+  .group{margin-bottom:34px;}
+  .group h2{
+    font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--text-dim);
+    text-transform:uppercase;font-weight:600;margin:0 0 14px;
+    padding-bottom:8px;border-bottom:1px solid var(--border);
   }
 
-  .tile{
-    background:var(--panel);border:2px solid var(--border);border-radius:6px;
-    overflow:hidden;cursor:pointer;position:relative;
+  .card{
+    display:block;background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:16px 18px;margin-bottom:12px;text-decoration:none;color:inherit;
     transition:border-color .12s, transform .06s;
-    display:flex;flex-direction:column;
   }
-  .tile:hover{border-color:#3a4149;}
-  .tile:active{transform:scale(0.98);}
-  .tile.live{
-    border-color:var(--tally-red);
-    box-shadow:0 0 0 1px var(--tally-red), 0 0 22px 1px var(--tally-red-glow);
+  .card:hover{border-color:var(--amber);}
+  .card:active{transform:scale(0.995);}
+  .card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .card-name{font-family:var(--mono);font-size:14.5px;font-weight:700;color:var(--text);}
+  .card-tag{
+    font-family:var(--mono);font-size:10px;letter-spacing:.08em;font-weight:700;
+    padding:2px 8px;border-radius:3px;flex-shrink:0;
   }
-  .tile.pip{
-    border-color:var(--amber);
-    box-shadow:0 0 0 1px var(--amber), 0 0 16px 1px var(--amber-glow);
-  }
-  .tile .tally-strip{ height:4px;width:100%;background:var(--border); }
-  .tile.live .tally-strip{background:var(--tally-red);}
-  .tile.pip .tally-strip{background:var(--amber);}
-
-  .thumb-wrap{
-    aspect-ratio:16/9;background:#000;position:relative;
-    display:flex;align-items:center;justify-content:center;overflow:hidden;
-  }
-  .thumb-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
-  .thumb-wrap .no-thumb{color:#3a4149;font-family:var(--mono);font-size:11px;letter-spacing:.1em;}
-
-  .tile-foot{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:9px 11px;background:var(--panel-2);
-  }
-  .tile-name{
-    font-size:13px;font-weight:600;color:var(--text);
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
-  .tile-key{
-    font-family:var(--mono);font-size:11px;color:var(--text-dim);
-    border:1px solid var(--border);border-radius:3px;padding:1px 6px;flex-shrink:0;margin-left:8px;
-  }
-  .tile.live .tile-key{color:var(--tally-red);border-color:var(--tally-red);}
-  .tile.live .tile-name{color:#fff;}
-  .tile.pip .tile-name{color:#fff;}
-
-  .on-air-badge{
-    position:absolute;top:8px;left:8px;
-    background:var(--tally-red);color:#fff;font-family:var(--mono);
-    font-size:9.5px;font-weight:700;letter-spacing:.14em;
-    padding:2px 6px;border-radius:2px;opacity:0;transition:opacity .12s;
-  }
-  .tile.live .on-air-badge{opacity:1;}
-  .pip-badge{
-    position:absolute;top:8px;right:8px;
-    background:var(--amber);color:#1a1305;font-family:var(--mono);
-    font-size:9.5px;font-weight:700;letter-spacing:.14em;
-    padding:2px 6px;border-radius:2px;opacity:0;transition:opacity .12s;
-  }
-  .tile.pip .pip-badge{opacity:1;}
-
-  .tile-actions{ padding:0 11px 10px; background:var(--panel-2); }
-  .pip-btn{
-    width:100%;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
-    padding:6px 0;border-radius:3px;border:1px solid var(--border);
-    background:var(--bg-deep);color:var(--text-dim);cursor:pointer;
-    transition:border-color .12s, color .12s;
-  }
-  .pip-btn:hover{border-color:var(--amber);color:var(--amber);}
-  .pip-btn.active{border-color:var(--amber);color:var(--amber);background:rgba(240,168,60,0.08);}
-
-  .footer-hint{
-    padding:10px 20px;font-family:var(--mono);font-size:11px;color:var(--text-dim);
-    border-top:1px solid var(--border);letter-spacing:.03em;
-  }
-  .footer-hint kbd{
-    background:var(--panel-2);border:1px solid var(--border);border-radius:3px;
-    padding:1px 5px;color:var(--text);font-family:var(--mono);
+  .tag-pc{background:rgba(230,41,59,0.12);color:var(--tally-red);border:1px solid rgba(230,41,59,0.4);}
+  .tag-phone{background:rgba(240,168,60,0.12);color:var(--amber);border:1px solid rgba(240,168,60,0.4);}
+  .card-desc{color:var(--text-dim);font-size:13px;line-height:1.6;margin-top:8px;}
+  .card-file{
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:8px;opacity:.7;
   }
 
-  @media (max-width:640px){
-    .topbar{flex-direction:column;align-items:flex-start;}
-    .pgm-readout{font-size:16px;}
-    .legend{margin-left:0;}
+  .note{
+    font-size:12.5px;color:var(--text-dim);line-height:1.7;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-top:6px;
   }
+  .note strong{color:var(--amber);}
 
-  /* ---- WebRTC phone camera panel ---- */
-  .webrtc-panel{
-    margin:0 20px 14px;border:1px solid var(--border);border-radius:6px;
-    background:var(--panel);
-  }
-  .webrtc-panel summary{
-    cursor:pointer;padding:11px 14px;font-family:var(--mono);font-size:12px;
-    letter-spacing:.04em;color:var(--text-dim);list-style:none;
-    display:flex;align-items:center;gap:8px;
-  }
-  .webrtc-panel summary::-webkit-details-marker{display:none;}
-  .webrtc-panel summary::before{content:'▸';color:var(--amber);}
-  .webrtc-panel[open] summary::before{content:'▾';}
-  .webrtc-panel summary:hover{color:var(--text);}
-  .webrtc-body{padding:0 16px 16px;}
-  .webrtc-note{
-    font-size:12px;color:var(--text-dim);line-height:1.6;
-    background:var(--panel-2);border:1px solid var(--border);border-radius:4px;
-    padding:10px 12px;margin:0 0 14px;
-  }
-  .webrtc-note strong{color:var(--amber);}
-  .webrtc-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
-  .wr-tab{
-    font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
-    padding:7px 12px;border-radius:4px;border:1px solid var(--border);
-    background:var(--panel-2);color:var(--text-dim);cursor:pointer;
-  }
-  .wr-tab.active{border-color:var(--amber);color:var(--amber);background:rgba(240,168,60,0.08);}
-  .wr-pane{display:none;}
-  .wr-pane.active{display:block;}
-  .wr-steps{
-    font-size:12px;color:var(--text-dim);line-height:1.8;margin:0 0 12px;padding-left:18px;
-  }
-  .wr-pane label{
-    display:block;font-family:var(--mono);font-size:11px;color:var(--text-dim);
-    letter-spacing:.06em;margin:10px 0 5px;
-  }
-  .wr-pane textarea{
-    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
-    font-family:var(--mono);font-size:11px;border-radius:4px;padding:8px;resize:vertical;
-  }
-  .wr-pane button{
-    font-family:var(--mono);font-size:12px;letter-spacing:.05em;font-weight:600;
-    padding:8px 14px;border-radius:4px;border:1px solid var(--border);
-    background:var(--panel-2);color:var(--text);cursor:pointer;margin-top:8px;margin-right:6px;
-  }
-  .wr-pane button:hover{border-color:var(--amber);color:var(--amber);}
-  .wr-pane video{
-    width:100%;max-width:320px;background:#000;border-radius:4px;margin-top:10px;display:block;
-    aspect-ratio:16/9;object-fit:cover;
-  }
-  .wr-status{
-    font-family:var(--mono);font-size:11.5px;color:var(--text-dim);margin-top:10px;letter-spacing:.02em;
-  }
-  .wr-status.error{color:var(--tally-red);}
-  .wr-status.ok{color:var(--amber);}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--border);
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:.03em;}
 </style>
 </head>
 <body>
-<div class="app">
 
-  <div class="topbar">
-    <div class="brand">
-      <span class="dot" id="connDot"></span>
-      <h1>MULTICAM SWITCH</h1>
-    </div>
+  <header>
+    <p class="kicker">OBS MULTICAM TOOLKIT</p>
+    <h1>OBS マルチカム・ツール集</h1>
+    <p>OBS Studioでカメラを切り替えたり、スマホの映像を取り込んだりするための小さなWebツール集です。すべてブラウザだけで動作し、サーバー不要です。</p>
+  </header>
 
-    <div class="pgm-readout">
-      <span class="label">ACTIVE</span>
-      <span id="activeName">— NO SIGNAL —</span>
-    </div>
-
-    <div class="conn-form">
-      <input id="hostInput" type="text" value="localhost" placeholder="host">
-      <input id="portInput" type="text" value="4455" placeholder="port" style="width:64px;">
-      <input id="passInput" type="password" placeholder="パスワード(任意)" class="wide">
-      <button id="connectBtn" class="primary">接続</button>
-      <button id="disconnectBtn" disabled>切断</button>
-    </div>
-  </div>
-
-  <div class="scene-bar">
-    <label for="sceneSelect">対象シーン(OBSと双方向連動)</label>
-    <select id="sceneSelect" class="wide" disabled></select>
-    <div class="legend">
-      <span><span class="swatch main"></span>メイン(全画面)</span>
-      <span><span class="swatch pip"></span>PIP(右下に重ねる)</span>
-    </div>
-  </div>
-
-  <details class="webrtc-panel" id="webrtcPanel">
-    <summary>📱 スマホカメラを取り込む(WebRTC・手動シグナリング)</summary>
-    <div class="webrtc-body">
-      <p class="webrtc-note">
-        スマホでカメラを使うには、このページを<strong>HTTPS</strong>で開く必要があります(<code>file://</code>や<code>http://192.168.x.x</code>ではカメラ許可が出ません)。
-        PCで簡易HTTPSサーバーを立てるか、ngrok等のトンネル経由でこのファイルを公開してください。サーバーは使わず、下のコードを手動でコピー&ペーストして1回だけ接続します。
-      </p>
-      <div class="webrtc-tabs">
-        <button type="button" class="wr-tab active" data-pane="phonePane">① スマホ側(送信)</button>
-        <button type="button" class="wr-tab" data-pane="receiverPane">② PC側(受信・OBSソース用)</button>
+  <div class="group">
+    <h2>スイッチャー</h2>
+    <a class="card" href="multicam-switcher.html">
+      <div class="card-top">
+        <span class="card-name">🎛️ Multicam Switcher</span>
+        <span class="card-tag tag-pc">PC</span>
       </div>
-
-      <div id="phonePane" class="wr-pane active">
-        <ol class="wr-steps">
-          <li>このページをスマホのブラウザ(HTTPS)で開く</li>
-          <li>「カメラを開始」を押して許可する</li>
-          <li>下に出るコードをコピーし、PC側(②)に貼り付けてもらう</li>
-          <li>PC側からもらったコードを下の欄に貼り付けて「接続を完了」</li>
-        </ol>
-        <video id="phonePreview" autoplay playsinline muted></video>
-        <button type="button" id="phoneStartBtn">カメラを開始</button>
-        <label>①→PCへ渡すコード</label>
-        <textarea id="phoneOfferOut" rows="3" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
-        <button type="button" class="copy-btn" data-target="phoneOfferOut">コピー</button>
-        <label>PCからもらったコードを貼り付け</label>
-        <textarea id="phoneAnswerIn" rows="3" placeholder="PC側(②)で生成されたコードを貼り付け"></textarea>
-        <button type="button" id="phoneCompleteBtn">接続を完了</button>
-        <div class="wr-status" id="phoneStatus"></div>
+      <div class="card-desc">
+        OBS WebSocketに接続し、シーン内のソースをメイン(全画面)/PIP(重ね表示)としてワンクリックや数字キーで切り替える操作パネル。OBSのシーン切り替えとも双方向に連動します。
       </div>
-
-      <div id="receiverPane" class="wr-pane">
-        <ol class="wr-steps">
-          <li>スマホ側(①)からもらったコードを下に貼り付け、「応答を作成」</li>
-          <li>出てきたコードをスマホに渡して貼り付けてもらう</li>
-          <li>下に映像が表示されたら、このページ全体をOBSの「ブラウザソース」として対象シーンに追加(ソース名は任意、例: PhoneCam)。追加後は上のソース一覧に通常のカメラと同様に表示され、メイン/PIP切り替えが使えます</li>
-        </ol>
-        <label>①スマホからもらったコードを貼り付け</label>
-        <textarea id="receiverOfferIn" rows="3" placeholder="スマホ側(①)で生成されたコードを貼り付け"></textarea>
-        <button type="button" id="receiverAnswerBtn">応答を作成</button>
-        <label>スマホへ渡すコード</label>
-        <textarea id="receiverAnswerOut" rows="3" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
-        <button type="button" class="copy-btn" data-target="receiverAnswerOut">コピー</button>
-        <video id="receiverVideo" autoplay playsinline></video>
-        <div class="wr-status" id="receiverStatus"></div>
-      </div>
-    </div>
-  </details>
-
-  <div class="status-line" id="statusLine">未接続 — OBSの「ツール > WebSocketサーバー設定」を有効にしてから接続してください。</div>
-
-  <div class="stage" id="stage">
-    <div class="empty-state">接続して対象シーンを選ぶと、そのシーン内のソースが一覧表示されます</div>
+      <div class="card-file">multicam-switcher.html</div>
+    </a>
   </div>
 
-  <div class="footer-hint">
-    クリック / <kbd>1</kbd>–<kbd>9</kbd> でメインに切り替え。「PIPにする」ボタン / <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> で右下に小さく重ねて表示します。
+  <div class="group">
+    <h2>カメラ取り込み</h2>
+
+    <a class="card" href="camera-source.html">
+      <div class="card-top">
+        <span class="card-name">🎥 Camera Source</span>
+        <span class="card-tag tag-pc">PC</span>
+      </div>
+      <div class="card-desc">
+        そのPCに接続されたカメラ(内蔵/USB/キャプチャデバイス)を選んで全画面表示するだけの最小構成。OBSのブラウザソースにそのまま登録できます。
+      </div>
+      <div class="card-file">camera-source.html</div>
+    </a>
+
+    <a class="card" href="webrtc-sender.html">
+      <div class="card-top">
+        <span class="card-name">📱 WebRTC Sender(シンプル版)</span>
+        <span class="card-tag tag-phone">スマホ</span>
+      </div>
+      <div class="card-desc">
+        スマホのカメラ映像をPCに送るための送信側ページ。接続情報(SDP)は手動コピー&ペーストで交換するので、サーバー不要ですぐ試せます。
+      </div>
+      <div class="card-file">webrtc-sender.html</div>
+    </a>
+
+    <a class="card" href="webrtc-receiver.html">
+      <div class="card-top">
+        <span class="card-name">💻 WebRTC Receiver(シンプル版)</span>
+        <span class="card-tag tag-pc">PC</span>
+      </div>
+      <div class="card-desc">
+        上記Senderとペアで使う受信側ページ。映像が表示されたら、そのままOBSのブラウザソースとして追加できます。
+      </div>
+      <div class="card-file">webrtc-receiver.html</div>
+    </a>
   </div>
 
-</div>
+  <div class="note">
+    <strong>注意:</strong> スマホでカメラ(<code>getUserMedia</code>)を使うページ(WebRTC Sender)は、
+    GitHub Pagesのような<strong>HTTPS</strong>配信であればそのまま動作します。OBSのブラウザソースでカメラ自体を使う場合(Camera Source)は、
+    OBSの起動オプションに <code>--use-fake-ui-for-media-stream --enable-media-stream</code> の追加が必要な場合があります。
+  </div>
 
-<script>
-(function(){
-  const $ = (id) => document.getElementById(id);
-  const hostInput = $('hostInput'), portInput = $('portInput'), passInput = $('passInput');
-  const connectBtn = $('connectBtn'), disconnectBtn = $('disconnectBtn');
-  const statusLine = $('statusLine'), connDot = $('connDot');
-  const stage = $('stage'), activeName = $('activeName');
-  const sceneSelect = $('sceneSelect');
+  <footer>MULTICAM TOOLKIT · 静的ページのみ・サーバー不要</footer>
 
-  let ws = null;
-  let identified = false;
-  let sceneList = [];
-  let currentSceneName = null;
-  let sceneItems = [];
-  let mainItemId = null;
-  let pipItemId = null;
-  let canvasWidth = 1920, canvasHeight = 1080;
-  const PIP_SCALE = 0.28, PIP_MARGIN = 24;
-  let reqCounter = 0;
-  const pending = new Map();
-  let thumbTimer = null;
-
-  function setStatus(msg, isError){
-    statusLine.textContent = msg;
-    statusLine.classList.toggle('error', !!isError);
-  }
-  function setDot(state){
-    connDot.classList.remove('live','connecting');
-    if(state) connDot.classList.add(state);
-  }
-
-  async function sha256base64(str){
-    const enc = new TextEncoder().encode(str);
-    const digest = await crypto.subtle.digest('SHA-256', enc);
-    return btoa(String.fromCharCode(...new Uint8Array(digest)));
-  }
-
-  function nextRequestId(){
-    reqCounter += 1;
-    return 'req-' + reqCounter;
-  }
-
-  function sendRequest(requestType, requestData){
-    return new Promise((resolve, reject) => {
-      if(!ws || ws.readyState !== WebSocket.OPEN){
-        reject(new Error('not connected'));
-        return;
-      }
-      const requestId = nextRequestId();
-      pending.set(requestId, {resolve, reject});
-      ws.send(JSON.stringify({
-        op: 6,
-        d: { requestType, requestId, requestData: requestData || {} }
-      }));
-      setTimeout(() => {
-        if(pending.has(requestId)){
-          pending.delete(requestId);
-          reject(new Error(requestType + ' timed out'));
-        }
-      }, 8000);
-    });
-  }
-
-  function resetState(){
-    identified = false;
-    sceneList = [];
-    currentSceneName = null;
-    sceneItems = [];
-    mainItemId = null;
-    pipItemId = null;
-    pending.clear();
-    if(thumbTimer){ clearInterval(thumbTimer); thumbTimer = null; }
-    sceneSelect.innerHTML = '';
-    sceneSelect.disabled = true;
-    renderTiles();
-    activeName.textContent = '— NO SIGNAL —';
-  }
-
-  function connect(){
-    const host = hostInput.value.trim() || 'localhost';
-    const port = portInput.value.trim() || '4455';
-    const password = passInput.value;
-
-    setStatus('接続しています…');
-    setDot('connecting');
-    connectBtn.disabled = true;
-
-    try{
-      ws = new WebSocket('ws://' + host + ':' + port);
-    }catch(err){
-      setStatus('接続に失敗しました: ' + err.message, true);
-      setDot(null);
-      connectBtn.disabled = false;
-      return;
-    }
-
-    ws.onopen = () => { setStatus('ハンドシェイク中…'); };
-
-    ws.onclose = () => {
-      setStatus('切断されました', false);
-      setDot(null);
-      connectBtn.disabled = false;
-      disconnectBtn.disabled = true;
-      resetState();
-    };
-
-    ws.onerror = () => {
-      setStatus('WebSocketエラー。ホスト/ポート、OBSのWebSocketサーバーが有効かを確認してください。', true);
-    };
-
-    ws.onmessage = async (evt) => {
-      let msg;
-      try{ msg = JSON.parse(evt.data); }catch(e){ return; }
-      const op = msg.op, d = msg.d || {};
-
-      if(op === 0){
-        let authentication;
-        if(d.authentication){
-          const secret = await sha256base64(password + d.authentication.salt);
-          authentication = await sha256base64(secret + d.authentication.challenge);
-        }
-        ws.send(JSON.stringify({
-          op: 1,
-          d: {
-            rpcVersion: d.rpcVersion,
-            authentication,
-            eventSubscriptions: 133
-          }
-        }));
-        return;
-      }
-
-      if(op === 2){
-        identified = true;
-        connectBtn.disabled = true;
-        disconnectBtn.disabled = false;
-        sceneSelect.disabled = false;
-        setDot('live');
-        setStatus('接続完了。設定を読み込んでいます…');
-        await loadVideoSettings();
-        await loadSceneList();
-        return;
-      }
-
-      if(op === 5){
-        if(d.eventType === 'SceneItemEnableStateChanged' && d.eventData.sceneName === currentSceneName){
-          const item = sceneItems.find(it => it.sceneItemId === d.eventData.sceneItemId);
-          if(item){
-            item.sceneItemEnabled = d.eventData.sceneItemEnabled;
-            updateActiveNameFromItems();
-            renderTiles();
-          }
-        }
-        if(d.eventType === 'SceneListChanged'){
-          loadSceneList();
-        }
-        if(d.eventType === 'CurrentProgramSceneChanged'){
-          const newScene = d.eventData.sceneName;
-          if(newScene && newScene !== currentSceneName){
-            if([...sceneSelect.options].some(o => o.value === newScene)){
-              sceneSelect.value = newScene;
-            }
-            selectScene(newScene);
-            setStatus('OBS側でシーンが切り替わりました · 対象シーンを「' + newScene + '」に追従');
-          }
-        }
-        return;
-      }
-
-      if(op === 7){
-        const requestId = d.requestId;
-        const entry = pending.get(requestId);
-        if(entry){
-          pending.delete(requestId);
-          if(d.requestStatus && d.requestStatus.result){
-            entry.resolve(d.responseData || {});
-          }else{
-            entry.reject(new Error((d.requestStatus && d.requestStatus.comment) || 'request failed'));
-          }
-        }
-        return;
-      }
-    };
-  }
-
-  function disconnect(){
-    if(ws) ws.close();
-  }
-
-  async function loadVideoSettings(){
-    try{
-      const data = await sendRequest('GetVideoSettings', {});
-      if(data.baseWidth) canvasWidth = data.baseWidth;
-      if(data.baseHeight) canvasHeight = data.baseHeight;
-    }catch(err){}
-  }
-
-  async function loadSceneList(){
-    try{
-      const data = await sendRequest('GetSceneList', {});
-      sceneList = (data.scenes || []).slice().sort((a,b) => a.sceneIndex - b.sceneIndex);
-      sceneSelect.innerHTML = '';
-      sceneList.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.sceneName;
-        opt.textContent = s.sceneName;
-        sceneSelect.appendChild(opt);
-      });
-      const preferred = data.currentProgramSceneName && sceneList.some(s => s.sceneName === data.currentProgramSceneName)
-        ? data.currentProgramSceneName
-        : (sceneList[0] && sceneList[0].sceneName);
-      if(preferred){
-        sceneSelect.value = preferred;
-        await selectScene(preferred);
-      }
-      setStatus('接続中 · シーン ' + sceneList.length + ' 件 · 対象「' + (preferred || '-') + '」');
-    }catch(err){
-      setStatus('シーン一覧の取得に失敗しました: ' + err.message, true);
-    }
-  }
-
-  async function selectScene(sceneName){
-    currentSceneName = sceneName;
-    try{
-      const data = await sendRequest('GetSceneItemList', { sceneName });
-      sceneItems = (data.sceneItems || []).slice().sort((a,b) => b.sceneItemId - a.sceneItemId);
-      const enabledItems = sceneItems.filter(it => it.sceneItemEnabled);
-      mainItemId = enabledItems.length === 1 ? enabledItems[0].sceneItemId : null;
-      pipItemId = null;
-      updateActiveNameFromItems();
-      renderTiles();
-      startThumbnailLoop();
-    }catch(err){
-      setStatus('ソース一覧の取得に失敗しました: ' + err.message, true);
-    }
-  }
-
-  function updateActiveNameFromItems(){
-    const mainItem = sceneItems.find(it => it.sceneItemId === mainItemId);
-    const pipItem = sceneItems.find(it => it.sceneItemId === pipItemId);
-    if(mainItem){
-      activeName.innerHTML = escapeHtml(mainItem.sourceName) +
-        (pipItem ? ' <span class="pip-part">+ PIP: ' + escapeHtml(pipItem.sourceName) + '</span>' : '');
-    }else{
-      const fallback = sceneItems.find(it => it.sceneItemEnabled);
-      activeName.textContent = fallback ? fallback.sourceName : '— NO SIGNAL —';
-    }
-  }
-
-  function renderTiles(){
-    stage.innerHTML = '';
-    if(!sceneItems.length){
-      const empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.textContent = identified ? 'このシーンにはソースがありません' : '接続して対象シーンを選ぶと、そのシーン内のソースが一覧表示されます';
-      stage.appendChild(empty);
-      return;
-    }
-    sceneItems.forEach((item, idx) => {
-      const isMain = item.sceneItemId === mainItemId ||
-        (mainItemId === null && item.sceneItemEnabled && item.sceneItemId !== pipItemId);
-      const isPip = item.sceneItemId === pipItemId;
-
-      const tile = document.createElement('div');
-      tile.className = 'tile' + (isMain ? ' live' : '') + (isPip ? ' pip' : '');
-      tile.innerHTML =
-        '<div class="tally-strip"></div>' +
-        '<div class="thumb-wrap" id="thumb-' + idx + '"><span class="no-thumb">NO SIGNAL</span></div>' +
-        '<div class="on-air-badge">ON AIR</div>' +
-        '<div class="pip-badge">PIP</div>' +
-        '<div class="tile-foot">' +
-          '<span class="tile-name">' + escapeHtml(item.sourceName) + '</span>' +
-          (idx < 9 ? '<span class="tile-key">' + (idx+1) + '</span>' : '') +
-        '</div>' +
-        '<div class="tile-actions">' +
-          '<button class="pip-btn' + (isPip ? ' active' : '') + '"' + (isMain ? ' disabled title="メインのソースはPIPにできません"' : '') + '>' +
-            (isPip ? 'PIP解除' : 'PIPにする') +
-          '</button>' +
-        '</div>';
-      tile.addEventListener('click', () => setMain(item.sceneItemId));
-      const pipBtn = tile.querySelector('.pip-btn');
-      pipBtn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        togglePip(item.sceneItemId);
-      });
-      stage.appendChild(tile);
-    });
-  }
-
-  function escapeHtml(str){
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-  }
-
-  async function setMain(itemId){
-    if(!identified || !currentSceneName) return;
-    try{
-      if(pipItemId === itemId) pipItemId = null;
-      mainItemId = itemId;
-      const tasks = sceneItems.map(item => {
-        if(item.sceneItemId === itemId){
-          return sendRequest('SetSceneItemEnabled', {
-            sceneName: currentSceneName, sceneItemId: item.sceneItemId, sceneItemEnabled: true
-          }).then(() => sendRequest('SetSceneItemTransform', {
-            sceneName: currentSceneName, sceneItemId: item.sceneItemId,
-            sceneItemTransform: {
-              boundsType: 'OBS_BOUNDS_STRETCH', boundsAlignment: 5,
-              boundsWidth: canvasWidth, boundsHeight: canvasHeight,
-              alignment: 5, positionX: 0, positionY: 0
-            }
-          })).then(() => { item.sceneItemEnabled = true; });
-        }
-        if(item.sceneItemId === pipItemId){
-          return Promise.resolve();
-        }
-        return sendRequest('SetSceneItemEnabled', {
-          sceneName: currentSceneName, sceneItemId: item.sceneItemId, sceneItemEnabled: false
-        }).then(() => { item.sceneItemEnabled = false; });
-      });
-      await Promise.all(tasks);
-      updateActiveNameFromItems();
-      renderTiles();
-    }catch(err){
-      setStatus('メイン切り替えに失敗しました: ' + err.message, true);
-    }
-  }
-
-  async function togglePip(itemId){
-    if(!identified || !currentSceneName) return;
-    if(itemId === mainItemId){
-      setStatus('メインのソースはPIPに設定できません', true);
-      return;
-    }
-    try{
-      if(pipItemId === itemId){
-        await sendRequest('SetSceneItemEnabled', {
-          sceneName: currentSceneName, sceneItemId: itemId, sceneItemEnabled: false
-        });
-        const item = sceneItems.find(it => it.sceneItemId === itemId);
-        if(item) item.sceneItemEnabled = false;
-        pipItemId = null;
-      }else{
-        const pipW = Math.round(canvasWidth * PIP_SCALE);
-        const pipH = Math.round(canvasHeight * PIP_SCALE);
-        await sendRequest('SetSceneItemEnabled', {
-          sceneName: currentSceneName, sceneItemId: itemId, sceneItemEnabled: true
-        });
-        await sendRequest('SetSceneItemTransform', {
-          sceneName: currentSceneName, sceneItemId: itemId,
-          sceneItemTransform: {
-            boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsAlignment: 5,
-            boundsWidth: pipW, boundsHeight: pipH,
-            alignment: 5,
-            positionX: canvasWidth - pipW - PIP_MARGIN,
-            positionY: canvasHeight - pipH - PIP_MARGIN
-          }
-        });
-        const item = sceneItems.find(it => it.sceneItemId === itemId);
-        if(item) item.sceneItemEnabled = true;
-        pipItemId = itemId;
-      }
-      updateActiveNameFromItems();
-      renderTiles();
-    }catch(err){
-      setStatus('PIP切り替えに失敗しました: ' + err.message, true);
-    }
-  }
-
-  function startThumbnailLoop(){
-    if(thumbTimer) clearInterval(thumbTimer);
-    refreshThumbnails();
-    thumbTimer = setInterval(refreshThumbnails, 2000);
-  }
-
-  async function refreshThumbnails(){
-    if(!identified) return;
-    for(let i = 0; i < sceneItems.length; i++){
-      const item = sceneItems[i];
-      try{
-        const data = await sendRequest('GetSourceScreenshot', {
-          sourceName: item.sourceName,
-          imageFormat: 'jpg',
-          imageWidth: 320,
-          imageHeight: 180
-        });
-        const wrap = document.getElementById('thumb-' + i);
-        if(wrap && data.imageData){
-          let src = data.imageData;
-          if(!src.startsWith('data:')) src = 'data:image/jpg;base64,' + src;
-          wrap.innerHTML = '<img src="' + src + '" alt="">';
-        }
-      }catch(err){}
-    }
-  }
-
-  sceneSelect.addEventListener('change', () => {
-    const val = sceneSelect.value;
-    if(!val) return;
-    selectScene(val);
-    sendRequest('SetCurrentProgramScene', { sceneName: val }).catch(err => {
-      setStatus('OBSへのシーン切り替え反映に失敗しました: ' + err.message, true);
-    });
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if(!identified) return;
-    if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
-    const n = parseInt(e.key, 10);
-    if(!isNaN(n) && n >= 1 && n <= 9 && sceneItems[n-1]){
-      if(e.shiftKey){
-        togglePip(sceneItems[n-1].sceneItemId);
-      }else{
-        setMain(sceneItems[n-1].sceneItemId);
-      }
-    }
-  });
-
-  connectBtn.addEventListener('click', connect);
-  disconnectBtn.addEventListener('click', disconnect);
-})();
-</script>
-
-<script>
-(function(){
-  const $ = (id) => document.getElementById(id);
-  const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
-
-  // ---- tab switching ----
-  document.querySelectorAll('.wr-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.wr-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.wr-pane').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      $(tab.dataset.pane).classList.add('active');
-    });
-  });
-
-  // ---- copy buttons ----
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const ta = $(btn.dataset.target);
-      ta.select();
-      try{
-        await navigator.clipboard.writeText(ta.value);
-      }catch(e){
-        document.execCommand('copy');
-      }
-      const original = btn.textContent;
-      btn.textContent = 'コピーしました';
-      setTimeout(() => { btn.textContent = original; }, 1200);
-    });
-  });
-
-  function waitIceComplete(pc){
-    return new Promise(resolve => {
-      if(pc.iceGatheringState === 'complete'){ resolve(); return; }
-      function check(){
-        if(pc.iceGatheringState === 'complete'){
-          pc.removeEventListener('icegatheringstatechange', check);
-          resolve();
-        }
-      }
-      pc.addEventListener('icegatheringstatechange', check);
-    });
-  }
-
-  function setStatus(el, msg, kind){
-    el.textContent = msg;
-    el.classList.remove('error', 'ok');
-    if(kind) el.classList.add(kind);
-  }
-
-  // ---- phone (sender) side ----
-  let phonePc = null;
-  const phoneStatus = $('phoneStatus');
-
-  $('phoneStartBtn').addEventListener('click', async () => {
-    if(!window.isSecureContext){
-      setStatus(phoneStatus, 'このページは安全な接続(HTTPS)で開かれていません。カメラ許可が出せないため、まずHTTPSで開き直してください。', 'error');
-      return;
-    }
-    try{
-      setStatus(phoneStatus, 'カメラを起動しています…');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false
-      });
-      $('phonePreview').srcObject = stream;
-
-      phonePc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      stream.getTracks().forEach(track => phonePc.addTrack(track, stream));
-
-      const offer = await phonePc.createOffer();
-      await phonePc.setLocalDescription(offer);
-      setStatus(phoneStatus, '接続情報を作成しています…');
-      await waitIceComplete(phonePc);
-
-      $('phoneOfferOut').value = JSON.stringify(phonePc.localDescription);
-      setStatus(phoneStatus, '上のコードをPC側(②)にコピーして渡してください。', 'ok');
-    }catch(err){
-      setStatus(phoneStatus, 'カメラ起動に失敗しました: ' + err.message, 'error');
-    }
-  });
-
-  $('phoneCompleteBtn').addEventListener('click', async () => {
-    if(!phonePc){
-      setStatus(phoneStatus, '先に「カメラを開始」を押してください。', 'error');
-      return;
-    }
-    try{
-      const raw = $('phoneAnswerIn').value.trim();
-      const answer = JSON.parse(raw);
-      await phonePc.setRemoteDescription(answer);
-      setStatus(phoneStatus, '接続しました。PC側の映像を確認してください。', 'ok');
-    }catch(err){
-      setStatus(phoneStatus, 'コードの読み込みに失敗しました。PC側から渡されたコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
-    }
-  });
-
-  // ---- PC (receiver) side ----
-  let receiverPc = null;
-  const receiverStatus = $('receiverStatus');
-
-  $('receiverAnswerBtn').addEventListener('click', async () => {
-    try{
-      const raw = $('receiverOfferIn').value.trim();
-      const offer = JSON.parse(raw);
-
-      receiverPc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      receiverPc.ontrack = (e) => {
-        $('receiverVideo').srcObject = e.streams[0];
-        setStatus(receiverStatus, '映像を受信しました。このページをOBSのブラウザソースとして追加してください。', 'ok');
-      };
-
-      await receiverPc.setRemoteDescription(offer);
-      const answer = await receiverPc.createAnswer();
-      await receiverPc.setLocalDescription(answer);
-      setStatus(receiverStatus, '応答を作成しています…');
-      await waitIceComplete(receiverPc);
-
-      $('receiverAnswerOut').value = JSON.stringify(receiverPc.localDescription);
-      setStatus(receiverStatus, '上のコードをスマホ側(①)に渡して貼り付けてもらってください。');
-    }catch(err){
-      setStatus(receiverStatus, 'コードの読み込みに失敗しました。スマホ側から渡されたコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
-    }
-  });
-})();
-</script>
 </body>
 </html>
