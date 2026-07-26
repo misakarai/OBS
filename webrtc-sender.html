@@ -91,6 +91,48 @@
     });
   }
 
+  function bufToBase64(buf){
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    const chunk = 0x8000;
+    for(let i = 0; i < bytes.length; i += chunk){
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function base64ToBuf(b64){
+    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+    while(b64.length % 4) b64 += '=';
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  async function encodeDescription(desc){
+    const json = JSON.stringify(desc);
+    if(window.CompressionStream){
+      const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+      const buf = await new Response(stream).arrayBuffer();
+      return 'gz:' + bufToBase64(buf);
+    }
+    return 'b64:' + bufToBase64(new TextEncoder().encode(json));
+  }
+
+  async function decodeDescription(text){
+    text = text.trim();
+    if(text.startsWith('gz:')){
+      const stream = new Blob([base64ToBuf(text.slice(3))]).stream().pipeThrough(new DecompressionStream('gzip'));
+      const json = await new Response(stream).text();
+      return JSON.parse(json);
+    }
+    if(text.startsWith('b64:')){
+      const json = new TextDecoder().decode(base64ToBuf(text.slice(4)));
+      return JSON.parse(json);
+    }
+    return JSON.parse(text); // backward compatibility: plain JSON pasted directly
+  }
+
   $('startBtn').addEventListener('click', async () => {
     if(!window.isSecureContext){
       setStatus('HTTPSで開かれていません。カメラ許可が出せないため開き直してください。', 'error');
@@ -113,8 +155,8 @@
       setStatus('接続情報を作成しています…');
       await waitIceComplete(pc);
 
-      $('offerOut').value = JSON.stringify(pc.localDescription);
-      setStatus('②のコードをコピーしてPC側に渡してください。', 'ok');
+      $('offerOut').value = await encodeDescription(pc.localDescription);
+      setStatus('②のコード('+ $('offerOut').value.length +'文字)をコピーしてPC側に渡してください。', 'ok');
     }catch(err){
       setStatus('カメラ起動に失敗しました: ' + err.message, 'error');
       $('startBtn').disabled = false;
@@ -134,7 +176,7 @@
       return;
     }
     try{
-      const answer = JSON.parse($('answerIn').value.trim());
+      const answer = await decodeDescription($('answerIn').value);
       await pc.setRemoteDescription(answer);
       setStatus('接続しました。この画面を閉じずにそのままにしてください。', 'ok');
     }catch(err){
