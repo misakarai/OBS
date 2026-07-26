@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebRTC 送信(スマホ側)</title>
+<title>WebRTC 送信(スマホ / PC)</title>
 <style>
   :root{
     --bg-deep:#0b0d10; --panel:#15181c; --border:#282e35;
@@ -39,6 +39,10 @@
   }
   button.secondary{background:var(--panel);border-color:var(--border);color:var(--text);}
   button:disabled{opacity:.5;}
+  select{
+    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
+    font-family:var(--mono);font-size:12.5px;padding:8px 10px;border-radius:5px;margin-top:6px;
+  }
   #status{
     font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:12px;line-height:1.6;
   }
@@ -47,12 +51,17 @@
 </style>
 </head>
 <body>
-  <h1>WebRTC 送信(スマホ側)</h1>
+  <h1>WebRTC 送信(スマホ / PC 共通)</h1>
   <p class="note">
     <strong>HTTPS</strong>で開く必要があります(file://や素のhttp://ではカメラ許可が出ません)。
+    スマホでもPCでも、このページ1つでカメラ映像を送信できます。
   </p>
 
   <video id="preview" autoplay playsinline muted></video>
+
+  <label>使用するカメラ</label>
+  <select id="deviceSelect"><option value="">自動(スマホは背面カメラ優先)</option></select>
+  <button id="refreshBtn" type="button" class="secondary">カメラ一覧を更新</button>
 
   <button id="startBtn" type="button">① カメラを開始</button>
 
@@ -133,6 +142,36 @@
     return JSON.parse(text); // backward compatibility: plain JSON pasted directly
   }
 
+  async function listDevices(){
+    try{
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      const sel = $('deviceSelect');
+      const current = sel.value;
+      sel.innerHTML = '<option value="">自動(スマホは背面カメラ優先)</option>';
+      cams.forEach((cam, i) => {
+        const opt = document.createElement('option');
+        opt.value = cam.deviceId;
+        opt.textContent = cam.label || ('カメラ ' + (i + 1));
+        sel.appendChild(opt);
+      });
+      if(current && cams.some(c => c.deviceId === current)) sel.value = current;
+    }catch(err){
+      // enumerateDevices can fail before permission is granted; ignore and keep the default option
+    }
+  }
+
+  $('refreshBtn').addEventListener('click', async () => {
+    // Request a throwaway stream first so device labels are populated (labels are blank until permission is granted once).
+    try{
+      const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+      tmp.getTracks().forEach(t => t.stop());
+    }catch(e){ /* ignore; list may just show unlabeled devices */ }
+    await listDevices();
+  });
+  navigator.mediaDevices.addEventListener?.('devicechange', listDevices);
+  listDevices();
+
   $('startBtn').addEventListener('click', async () => {
     if(!window.isSecureContext){
       setStatus('HTTPSで開かれていません。カメラ許可が出せないため開き直してください。', 'error');
@@ -141,11 +180,14 @@
     $('startBtn').disabled = true;
     setStatus('カメラを起動しています…');
     try{
+      const deviceId = $('deviceSelect').value;
+      const videoConstraint = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' };
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: videoConstraint,
         audio: false
       });
       $('preview').srcObject = stream;
+      await listDevices(); // labels are now available after permission was granted
 
       pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
