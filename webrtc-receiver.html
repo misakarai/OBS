@@ -71,6 +71,15 @@
   }
   #status.error{color:var(--tally-red);}
   #status.ok{color:var(--amber);}
+  .qr-holder{ margin-top:8px; text-align:center; }
+  .qr-holder img, .qr-holder canvas{ background:#fff; padding:8px; border-radius:6px; }
+  .scan-box{
+    margin-top:8px;background:var(--bg-deep);border:1px solid var(--border);
+    border-radius:6px;padding:10px;text-align:center;
+  }
+  .scan-box video{
+    width:100%;max-width:280px;border-radius:6px;background:#000;aspect-ratio:1/1;object-fit:cover;
+  }
 </style>
 </head>
 <body>
@@ -101,18 +110,28 @@
 
       <div id="manualPane" class="pane">
         <label>①スマホからもらったコードを貼り付け</label>
-        <textarea id="offerIn" rows="4" placeholder="スマホ側で生成されたコードを貼り付け"></textarea>
+        <textarea id="offerIn" rows="3" placeholder="スマホ側で生成されたコードを貼り付け"></textarea>
+        <button id="scanOfferBtn" type="button" class="secondary">QRを読み取る</button>
+        <div id="offerScanBox" class="scan-box" style="display:none;">
+          <video id="offerScanVideo" autoplay playsinline muted></video>
+          <button id="cancelScanBtn" type="button" class="secondary">キャンセル</button>
+        </div>
         <button id="answerBtn" type="button">② 応答を作成</button>
 
-        <label>③スマホへ渡すコード</label>
-        <textarea id="answerOut" rows="4" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
+        <label>③スマホへ渡すコード(生成時に自動コピー済み)</label>
+        <textarea id="answerOut" rows="3" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
         <button id="copyAnswerBtn" type="button" class="secondary">コピー</button>
+        <button id="shareAnswerBtn" type="button" class="secondary" style="display:none;">共有</button>
+        <button id="showAnswerQrBtn" type="button" class="secondary">QR表示</button>
+        <div id="answerQrHolder" class="qr-holder"></div>
       </div>
 
       <div id="status">①のタブなら合言葉を決めて「待ち受けを開始」を押してください。</div>
     </div>
   </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
 <script>
 (function(){
   const $ = (id) => document.getElementById(id);
@@ -159,6 +178,69 @@
     const isOpen = pane.style.display === 'flex';
     pane.style.display = isOpen ? 'none' : 'flex';
   });
+
+  // ---- shared: copy / share / QR helpers ----
+  async function autoCopy(text){
+    try{ await navigator.clipboard.writeText(text); }
+    catch(e){ /* clipboard may be unavailable without a direct user gesture; the manual copy button still works */ }
+  }
+
+  function updateShareButton(btn, text, title){
+    if(navigator.share){
+      btn.style.display = 'inline-block';
+      btn.onclick = () => navigator.share({ title, text }).catch(() => {});
+    }else{
+      btn.style.display = 'none';
+    }
+  }
+
+  function renderQr(holderId, text){
+    const holder = $(holderId);
+    if(!holder || !text) return;
+    holder.innerHTML = '';
+    if(window.QRCode) new QRCode(holder, { text, width: 200, height: 200 });
+  }
+
+  let qrScanStream = null;
+  let qrScanRAF = null;
+  function startQrScan(videoId, boxId, onResult){
+    const video = $(videoId);
+    const box = $(boxId);
+    box.style.display = 'block';
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        qrScanStream = stream;
+        video.srcObject = stream;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        function tick(){
+          if(!qrScanStream) return;
+          if(video.readyState === video.HAVE_ENOUGH_DATA){
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = window.jsQR && window.jsQR(imageData.data, imageData.width, imageData.height);
+            if(code && code.data){
+              stopQrScan();
+              onResult(code.data);
+              return;
+            }
+          }
+          qrScanRAF = requestAnimationFrame(tick);
+        }
+        qrScanRAF = requestAnimationFrame(tick);
+      })
+      .catch(err => {
+        box.style.display = 'none';
+        setStatus('カメラを使ったQR読み取りに失敗しました: ' + err.message, 'error');
+      });
+  }
+  function stopQrScan(){
+    if(qrScanRAF){ cancelAnimationFrame(qrScanRAF); qrScanRAF = null; }
+    if(qrScanStream){ qrScanStream.getTracks().forEach(t => t.stop()); qrScanStream = null; }
+    document.querySelectorAll('.scan-box').forEach(box => box.style.display = 'none');
+  }
 
   // ---- shared: compact SDP encode/decode (manual mode) ----
   function bufToBase64(buf){
@@ -364,7 +446,10 @@
       await waitIceComplete(pc);
 
       $('answerOut').value = await encodeDescription(pc.localDescription);
-      setStatus('③のコード('+ $('answerOut').value.length +'文字)をコピーしてスマホ側に渡してください。');
+      await autoCopy($('answerOut').value);
+      updateShareButton($('shareAnswerBtn'), $('answerOut').value, 'カメラ受信への応答コード');
+      if(answerQrOpen) renderQr('answerQrHolder', $('answerOut').value);
+      setStatus('③のコード('+ $('answerOut').value.length +'文字)を自動コピーしました。スマホ側に渡してください。', 'ok');
     }catch(err){
       setStatus('コードの読み込みに失敗しました。スマホ側のコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
     }
@@ -376,6 +461,22 @@
     try{ await navigator.clipboard.writeText(ta.value); }catch(e){ document.execCommand('copy'); }
     setStatus('コピーしました。スマホ側に貼り付けてもらってください。');
   });
+
+  let answerQrOpen = false;
+  $('showAnswerQrBtn').addEventListener('click', () => {
+    answerQrOpen = !answerQrOpen;
+    $('showAnswerQrBtn').textContent = answerQrOpen ? 'QRを隠す' : 'QR表示';
+    if(answerQrOpen) renderQr('answerQrHolder', $('answerOut').value);
+    else $('answerQrHolder').innerHTML = '';
+  });
+
+  $('scanOfferBtn').addEventListener('click', () => {
+    startQrScan('offerScanVideo', 'offerScanBox', (text) => {
+      $('offerIn').value = text;
+      setStatus('QRを読み取りました。「②応答を作成」を押してください。', 'ok');
+    });
+  });
+  $('cancelScanBtn').addEventListener('click', stopQrScan);
 })();
 </script>
 </body>

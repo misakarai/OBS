@@ -68,6 +68,15 @@
   }
   #status.error{color:var(--tally-red);}
   #status.ok{color:var(--amber);}
+  .qr-holder{ margin-top:8px; text-align:center; }
+  .qr-holder img, .qr-holder canvas{ background:#fff; padding:8px; border-radius:6px; }
+  .scan-box{
+    margin-top:8px;background:var(--panel);border:1px solid var(--border);
+    border-radius:6px;padding:10px;text-align:center;
+  }
+  .scan-box video{
+    width:100%;max-width:280px;border-radius:6px;background:#000;aspect-ratio:1/1;object-fit:cover;
+  }
 </style>
 </head>
 <body>
@@ -105,17 +114,27 @@
   <div id="manualPane" class="pane">
     <button id="manualStartBtn" type="button">① カメラを開始</button>
 
-    <label>②→PC側に渡すコード</label>
-    <textarea id="offerOut" rows="4" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
+    <label>②→PC側に渡すコード(生成時に自動コピー済み)</label>
+    <textarea id="offerOut" rows="3" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
     <button id="copyOfferBtn" type="button" class="secondary">コピー</button>
+    <button id="shareOfferBtn" type="button" class="secondary" style="display:none;">共有</button>
+    <button id="showOfferQrBtn" type="button" class="secondary">QR表示</button>
+    <div id="offerQrHolder" class="qr-holder"></div>
 
     <label>③PC側からもらったコードを貼り付け</label>
-    <textarea id="answerIn" rows="4" placeholder="PC側で生成されたコードを貼り付け"></textarea>
+    <textarea id="answerIn" rows="3" placeholder="PC側で生成されたコードを貼り付け"></textarea>
+    <button id="scanAnswerBtn" type="button" class="secondary">QRを読み取る</button>
+    <div id="answerScanBox" class="scan-box" style="display:none;">
+      <video id="answerScanVideo" autoplay playsinline muted></video>
+      <button id="cancelScanBtn" type="button" class="secondary">キャンセル</button>
+    </div>
     <button id="completeBtn" type="button">④ 接続を完了</button>
   </div>
 
   <div id="status">①のタブを選んだ状態で開始してください。</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
 <script>
 (function(){
   const $ = (id) => document.getElementById(id);
@@ -194,6 +213,70 @@
       }
       throw err;
     }
+  }
+
+  // ---- shared: copy / share / QR helpers ----
+  async function autoCopy(text){
+    try{ await navigator.clipboard.writeText(text); }
+    catch(e){ /* clipboard may be unavailable without a direct user gesture; the manual copy button still works */ }
+  }
+
+  function updateShareButton(btn, text, title){
+    if(navigator.share){
+      btn.style.display = 'inline-block';
+      btn.onclick = () => navigator.share({ title, text }).catch(() => {});
+    }else{
+      btn.style.display = 'none';
+    }
+  }
+
+  function renderQr(holderId, text){
+    const holder = $(holderId);
+    if(!holder || !text) return;
+    holder.innerHTML = '';
+    if(window.QRCode) new QRCode(holder, { text, width: 200, height: 200 });
+  }
+
+  let qrScanStream = null;
+  let qrScanRAF = null;
+  function startQrScan(videoId, boxId, onResult){
+    const video = $(videoId);
+    const box = $(boxId);
+    box.style.display = 'block';
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        qrScanStream = stream;
+        video.srcObject = stream;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        function tick(){
+          if(!qrScanStream) return;
+          if(video.readyState === video.HAVE_ENOUGH_DATA){
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = window.jsQR && window.jsQR(imageData.data, imageData.width, imageData.height);
+            if(code && code.data){
+              stopQrScan();
+              onResult(code.data);
+              return;
+            }
+          }
+          qrScanRAF = requestAnimationFrame(tick);
+        }
+        qrScanRAF = requestAnimationFrame(tick);
+      })
+      .catch(err => {
+        box.style.display = 'none';
+        setStatus('カメラを使ったQR読み取りに失敗しました: ' + err.message, 'error');
+      });
+  }
+  function stopQrScan(){
+    if(qrScanRAF){ cancelAnimationFrame(qrScanRAF); qrScanRAF = null; }
+    if(qrScanStream){ qrScanStream.getTracks().forEach(t => t.stop()); qrScanStream = null; }
+    const box = document.querySelector('.scan-box');
+    if(box) box.style.display = 'none';
   }
 
   // ---- shared: compact SDP encode/decode (manual mode) ----
@@ -398,7 +481,10 @@
       await waitIceComplete(pc);
 
       $('offerOut').value = await encodeDescription(pc.localDescription);
-      setStatus('②のコード('+ $('offerOut').value.length +'文字)をコピーしてPC側に渡してください。', 'ok');
+      await autoCopy($('offerOut').value);
+      updateShareButton($('shareOfferBtn'), $('offerOut').value, 'カメラ映像への接続コード');
+      if(offerQrOpen) renderQr('offerQrHolder', $('offerOut').value);
+      setStatus('②のコード('+ $('offerOut').value.length +'文字)を自動コピーしました。PC側に渡してください。', 'ok');
     }catch(err){
       setStatus('カメラ起動に失敗しました: ' + err.message, 'error');
       $('manualStartBtn').disabled = false;
@@ -411,6 +497,22 @@
     try{ await navigator.clipboard.writeText(ta.value); }catch(e){ document.execCommand('copy'); }
     setStatus('コピーしました。PC側に貼り付けてください。', 'ok');
   });
+
+  let offerQrOpen = false;
+  $('showOfferQrBtn').addEventListener('click', () => {
+    offerQrOpen = !offerQrOpen;
+    $('showOfferQrBtn').textContent = offerQrOpen ? 'QRを隠す' : 'QR表示';
+    if(offerQrOpen) renderQr('offerQrHolder', $('offerOut').value);
+    else $('offerQrHolder').innerHTML = '';
+  });
+
+  $('scanAnswerBtn').addEventListener('click', () => {
+    startQrScan('answerScanVideo', 'answerScanBox', (text) => {
+      $('answerIn').value = text;
+      setStatus('QRを読み取りました。「④接続を完了」を押してください。', 'ok');
+    });
+  });
+  $('cancelScanBtn').addEventListener('click', stopQrScan);
 
   $('completeBtn').addEventListener('click', async () => {
     if(!pc){
