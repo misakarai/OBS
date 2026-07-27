@@ -16,6 +16,8 @@
     --tally-red-glow:rgba(230,41,59,0.55);
     --amber:#f0a83c;
     --amber-glow:rgba(240,168,60,0.45);
+    --locked-blue:#4fb2e6;
+    --locked-blue-glow:rgba(79,178,230,0.4);
     --mono:'SFMono-Regular','IBM Plex Mono','Consolas','Courier New',monospace;
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   }
@@ -87,6 +89,7 @@
   .legend .swatch{ width:9px;height:9px;border-radius:2px; }
   .legend .swatch.main{ background:var(--tally-red); }
   .legend .swatch.pip{ background:var(--amber); }
+  .legend .swatch.locked{ background:#4fb2e6; }
 
   .status-line{
     padding:8px 20px;font-family:var(--mono);font-size:11.5px;color:var(--text-dim);
@@ -120,9 +123,15 @@
     border-color:var(--amber);
     box-shadow:0 0 0 1px var(--amber), 0 0 16px 1px var(--amber-glow);
   }
+  .tile.locked{
+    border-color:var(--locked-blue);
+    box-shadow:0 0 0 1px var(--locked-blue), 0 0 14px 1px var(--locked-blue-glow);
+  }
+  .tile.locked.off{ opacity:0.55; box-shadow:none; }
   .tile .tally-strip{ height:4px;width:100%;background:var(--border); }
   .tile.live .tally-strip{background:var(--tally-red);}
   .tile.pip .tally-strip{background:var(--amber);}
+  .tile.locked .tally-strip{background:var(--locked-blue);}
 
   .thumb-wrap{
     aspect-ratio:16/9;background:#000;position:relative;
@@ -146,6 +155,7 @@
   .tile.live .tile-key{color:var(--tally-red);border-color:var(--tally-red);}
   .tile.live .tile-name{color:#fff;}
   .tile.pip .tile-name{color:#fff;}
+  .tile.locked .tile-name{color:#fff;}
 
   .on-air-badge{
     position:absolute;top:8px;left:8px;
@@ -161,16 +171,25 @@
     padding:2px 6px;border-radius:2px;opacity:0;transition:opacity .12s;
   }
   .tile.pip .pip-badge{opacity:1;}
+  .locked-badge{
+    position:absolute;top:8px;right:8px;
+    background:var(--locked-blue);color:#04222f;font-family:var(--mono);
+    font-size:9.5px;font-weight:700;letter-spacing:.1em;
+    padding:2px 6px;border-radius:2px;opacity:0;transition:opacity .12s;
+  }
+  .tile.locked .locked-badge{opacity:1;}
 
-  .tile-actions{ padding:0 11px 10px; background:var(--panel-2); }
-  .pip-btn{
-    width:100%;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  .tile-actions{ padding:0 11px 10px; background:var(--panel-2); display:flex; gap:6px; }
+  .pip-btn, .lock-btn{
+    flex:1;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
     padding:6px 0;border-radius:3px;border:1px solid var(--border);
     background:var(--bg-deep);color:var(--text-dim);cursor:pointer;
     transition:border-color .12s, color .12s;
   }
   .pip-btn:hover{border-color:var(--amber);color:var(--amber);}
   .pip-btn.active{border-color:var(--amber);color:var(--amber);background:rgba(240,168,60,0.08);}
+  .lock-btn:hover{border-color:var(--locked-blue);color:var(--locked-blue);}
+  .lock-btn.active{border-color:var(--locked-blue);color:var(--locked-blue);background:rgba(79,178,230,0.1);}
 
   .footer-hint{
     padding:10px 20px;font-family:var(--mono);font-size:11px;color:var(--text-dim);
@@ -274,6 +293,7 @@
     <div class="legend">
       <span><span class="swatch main"></span>メイン(全画面)</span>
       <span><span class="swatch pip"></span>PIP(右下に重ねる)</span>
+      <span><span class="swatch locked"></span>固定(切替対象外)</span>
     </div>
   </div>
 
@@ -333,6 +353,7 @@
 
   <div class="footer-hint">
     クリック / <kbd>1</kbd>–<kbd>9</kbd> でメインに切り替え。「PIPにする」ボタン / <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> で右下に小さく重ねて表示します。
+    テロップなど常に出しておきたいソースは「固定にする」で切替対象から外せます(固定したタイルはクリックでON/OFFのみ切り替わります)。
   </div>
 
 </div>
@@ -353,6 +374,7 @@
   let sceneItems = [];
   let mainItemId = null;
   let pipItemId = null;
+  let lockedItemIds = new Set();
   let canvasWidth = 1920, canvasHeight = 1080;
   const PIP_SCALE = 0.28, PIP_MARGIN = 24;
   let reqCounter = 0;
@@ -407,6 +429,7 @@
     sceneItems = [];
     mainItemId = null;
     pipItemId = null;
+    lockedItemIds = new Set();
     pending.clear();
     if(thumbTimer){ clearInterval(thumbTimer); thumbTimer = null; }
     sceneSelect.innerHTML = '';
@@ -566,6 +589,7 @@
       const enabledItems = sceneItems.filter(it => it.sceneItemEnabled);
       mainItemId = enabledItems.length === 1 ? enabledItems[0].sceneItemId : null;
       pipItemId = null;
+      lockedItemIds = new Set();
       updateActiveNameFromItems();
       renderTiles();
       startThumbnailLoop();
@@ -596,31 +620,46 @@
       return;
     }
     sceneItems.forEach((item, idx) => {
-      const isMain = item.sceneItemId === mainItemId ||
-        (mainItemId === null && item.sceneItemEnabled && item.sceneItemId !== pipItemId);
-      const isPip = item.sceneItemId === pipItemId;
+      const isLocked = lockedItemIds.has(item.sceneItemId);
+      const isMain = !isLocked && (item.sceneItemId === mainItemId ||
+        (mainItemId === null && item.sceneItemEnabled && item.sceneItemId !== pipItemId));
+      const isPip = !isLocked && item.sceneItemId === pipItemId;
 
       const tile = document.createElement('div');
-      tile.className = 'tile' + (isMain ? ' live' : '') + (isPip ? ' pip' : '');
+      tile.className = 'tile' + (isMain ? ' live' : '') + (isPip ? ' pip' : '') +
+        (isLocked ? ' locked' : '') + (isLocked && !item.sceneItemEnabled ? ' off' : '');
+      const actionsHtml = isLocked
+        ? '<button class="lock-btn active">固定解除</button>'
+        : '<button class="pip-btn' + (isPip ? ' active' : '') + '"' + (isMain ? ' disabled title="メインのソースはPIPにできません"' : '') + '>' +
+            (isPip ? 'PIP解除' : 'PIPにする') +
+          '</button>' +
+          '<button class="lock-btn">固定にする</button>';
       tile.innerHTML =
         '<div class="tally-strip"></div>' +
         '<div class="thumb-wrap" id="thumb-' + idx + '"><span class="no-thumb">NO SIGNAL</span></div>' +
         '<div class="on-air-badge">ON AIR</div>' +
         '<div class="pip-badge">PIP</div>' +
+        '<div class="locked-badge">固定</div>' +
         '<div class="tile-foot">' +
           '<span class="tile-name">' + escapeHtml(item.sourceName) + '</span>' +
-          (idx < 9 ? '<span class="tile-key">' + (idx+1) + '</span>' : '') +
+          (idx < 9 && !isLocked ? '<span class="tile-key">' + (idx+1) + '</span>' : '') +
         '</div>' +
-        '<div class="tile-actions">' +
-          '<button class="pip-btn' + (isPip ? ' active' : '') + '"' + (isMain ? ' disabled title="メインのソースはPIPにできません"' : '') + '>' +
-            (isPip ? 'PIP解除' : 'PIPにする') +
-          '</button>' +
-        '</div>';
-      tile.addEventListener('click', () => setMain(item.sceneItemId));
+        '<div class="tile-actions">' + actionsHtml + '</div>';
+      tile.addEventListener('click', () => {
+        if(isLocked) toggleLockedVisibility(item.sceneItemId);
+        else setMain(item.sceneItemId);
+      });
       const pipBtn = tile.querySelector('.pip-btn');
-      pipBtn.addEventListener('click', (ev) => {
+      if(pipBtn){
+        pipBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          togglePip(item.sceneItemId);
+        });
+      }
+      const lockBtn = tile.querySelector('.lock-btn');
+      lockBtn.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        togglePip(item.sceneItemId);
+        toggleLocked(item.sceneItemId);
       });
       stage.appendChild(tile);
     });
@@ -630,6 +669,34 @@
     const d = document.createElement('div');
     d.textContent = str;
     return d.innerHTML;
+  }
+
+  function toggleLocked(itemId){
+    if(lockedItemIds.has(itemId)){
+      lockedItemIds.delete(itemId);
+    }else{
+      lockedItemIds.add(itemId);
+      if(mainItemId === itemId) mainItemId = null;
+      if(pipItemId === itemId) pipItemId = null;
+    }
+    updateActiveNameFromItems();
+    renderTiles();
+  }
+
+  async function toggleLockedVisibility(itemId){
+    if(!identified || !currentSceneName) return;
+    const item = sceneItems.find(it => it.sceneItemId === itemId);
+    if(!item) return;
+    const newState = !item.sceneItemEnabled;
+    try{
+      await sendRequest('SetSceneItemEnabled', {
+        sceneName: currentSceneName, sceneItemId: itemId, sceneItemEnabled: newState
+      });
+      item.sceneItemEnabled = newState;
+      renderTiles();
+    }catch(err){
+      setStatus('切り替えに失敗しました: ' + err.message, true);
+    }
   }
 
   async function setMain(itemId){
@@ -650,7 +717,7 @@
             }
           })).then(() => { item.sceneItemEnabled = true; });
         }
-        if(item.sceneItemId === pipItemId){
+        if(item.sceneItemId === pipItemId || lockedItemIds.has(item.sceneItemId)){
           return Promise.resolve();
         }
         return sendRequest('SetSceneItemEnabled', {
@@ -747,10 +814,15 @@
     if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
     const n = parseInt(e.key, 10);
     if(!isNaN(n) && n >= 1 && n <= 9 && sceneItems[n-1]){
+      const targetId = sceneItems[n-1].sceneItemId;
+      if(lockedItemIds.has(targetId)){
+        setStatus('このソースは固定(切替対象外)に設定されています。', true);
+        return;
+      }
       if(e.shiftKey){
-        togglePip(sceneItems[n-1].sceneItemId);
+        togglePip(targetId);
       }else{
-        setMain(sceneItems[n-1].sceneItemId);
+        setMain(targetId);
       }
     }
   });

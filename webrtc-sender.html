@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WebRTC 送信(スマホ / PC)</title>
+<title>WebRTC 送信(スマホ側)</title>
 <style>
   :root{
     --bg-deep:#0b0d10; --panel:#15181c; --border:#282e35;
@@ -28,10 +28,6 @@
     display:block;font-family:var(--mono);font-size:11px;color:var(--text-dim);
     letter-spacing:.05em;margin:16px 0 6px;
   }
-  input[type="text"], input[type="password"], input[type="number"]{
-    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
-    font-family:var(--mono);font-size:12.5px;padding:8px 10px;border-radius:5px;
-  }
   textarea{
     width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
     font-family:var(--mono);font-size:11px;border-radius:5px;padding:8px;resize:vertical;
@@ -43,26 +39,6 @@
   }
   button.secondary{background:var(--panel);border-color:var(--border);color:var(--text);}
   button:disabled{opacity:.5;}
-  select{
-    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
-    font-family:var(--mono);font-size:12.5px;padding:8px 10px;border-radius:5px;margin-top:6px;
-  }
-  .checkbox-row{
-    display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
-    color:var(--text-dim);letter-spacing:.02em;margin-top:14px;
-  }
-  .checkbox-row input{width:16px;height:16px;accent-color:var(--amber);}
-  .row2{display:flex;gap:8px;}
-  .row2 > div{flex:1;}
-  .tabs{display:flex;gap:6px;margin-top:20px;}
-  .tab{
-    font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
-    padding:8px 12px;border-radius:5px;border:1px solid var(--border);
-    background:var(--panel);color:var(--text-dim);cursor:pointer;flex:1;text-align:center;
-  }
-  .tab.active{border-color:var(--amber);color:var(--amber);background:rgba(240,168,60,0.08);}
-  .pane{display:none;margin-top:14px;}
-  .pane.active{display:block;}
   #status{
     font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:12px;line-height:1.6;
   }
@@ -71,50 +47,24 @@
 </style>
 </head>
 <body>
-  <h1>WebRTC 送信(スマホ / PC 共通)</h1>
+  <h1>WebRTC 送信(スマホ側)</h1>
   <p class="note">
     <strong>HTTPS</strong>で開く必要があります(file://や素のhttp://ではカメラ許可が出ません)。
   </p>
 
   <video id="preview" autoplay playsinline muted></video>
 
-  <label>使用するカメラ</label>
-  <select id="deviceSelect"><option value="">自動(スマホは背面カメラ優先)</option></select>
-  <button id="refreshBtn" type="button" class="secondary">カメラ一覧を更新</button>
+  <button id="startBtn" type="button">① カメラを開始</button>
 
-  <label class="checkbox-row"><input type="checkbox" id="audioToggle"> マイクの音声も一緒に送信する</label>
+  <label>②→PC側に渡すコード</label>
+  <textarea id="offerOut" rows="4" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
+  <button id="copyOfferBtn" type="button" class="secondary">コピー</button>
 
-  <div class="tabs">
-    <button type="button" class="tab active" data-pane="obsPane">① OBS経由(かんたん)</button>
-    <button type="button" class="tab" data-pane="manualPane">② 手動コピペ(サーバー不要)</button>
-  </div>
+  <label>③PC側からもらったコードを貼り付け</label>
+  <textarea id="answerIn" rows="4" placeholder="PC側で生成されたコードを貼り付け"></textarea>
+  <button id="completeBtn" type="button">④ 接続を完了</button>
 
-  <div id="obsPane" class="pane active">
-    <label>OBSホスト</label>
-    <div class="row2">
-      <div><input type="text" id="obsHost" value="localhost" placeholder="host"></div>
-      <div><input type="number" id="obsPort" value="4455" placeholder="port"></div>
-    </div>
-    <label>OBS WebSocketパスワード(任意)</label>
-    <input type="password" id="obsPass" placeholder="パスワード">
-    <label>合言葉(ルームコード・受信側と同じ文字列)</label>
-    <input type="text" id="roomCode" placeholder="例: cam1">
-    <button id="obsConnectBtn" type="button">接続を開始</button>
-  </div>
-
-  <div id="manualPane" class="pane">
-    <button id="manualStartBtn" type="button">① カメラを開始</button>
-
-    <label>②→PC側に渡すコード</label>
-    <textarea id="offerOut" rows="4" readonly placeholder="「カメラを開始」を押すと生成されます"></textarea>
-    <button id="copyOfferBtn" type="button" class="secondary">コピー</button>
-
-    <label>③PC側からもらったコードを貼り付け</label>
-    <textarea id="answerIn" rows="4" placeholder="PC側で生成されたコードを貼り付け"></textarea>
-    <button id="completeBtn" type="button">④ 接続を完了</button>
-  </div>
-
-  <div id="status">①のタブを選んだ状態で開始してください。</div>
+  <div id="status">準備完了。①から順に進めてください。</div>
 
 <script>
 (function(){
@@ -141,239 +91,19 @@
     });
   }
 
-  // ---- tab switching ----
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      $(tab.dataset.pane).classList.add('active');
-    });
-  });
-
-  // ---- shared: camera device list ----
-  async function listDevices(){
-    try{
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter(d => d.kind === 'videoinput');
-      const sel = $('deviceSelect');
-      const current = sel.value;
-      sel.innerHTML = '<option value="">自動(スマホは背面カメラ優先)</option>';
-      cams.forEach((cam, i) => {
-        const opt = document.createElement('option');
-        opt.value = cam.deviceId;
-        opt.textContent = cam.label || ('カメラ ' + (i + 1));
-        sel.appendChild(opt);
-      });
-      if(current && cams.some(c => c.deviceId === current)) sel.value = current;
-    }catch(err){
-      // enumerateDevices can fail before permission is granted; ignore and keep the default option
-    }
-  }
-  $('refreshBtn').addEventListener('click', async () => {
-    try{
-      const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
-      tmp.getTracks().forEach(t => t.stop());
-    }catch(e){ /* ignore; list may just show unlabeled devices */ }
-    await listDevices();
-  });
-  navigator.mediaDevices.addEventListener?.('devicechange', listDevices);
-  listDevices();
-
-  async function getCameraStream(){
-    const deviceId = $('deviceSelect').value;
-    const videoConstraint = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' };
-    const wantAudio = $('audioToggle').checked;
-    try{
-      return await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: wantAudio });
-    }catch(err){
-      if(wantAudio){
-        setStatus('マイクが使えなかったため、映像のみで起動します…');
-        $('audioToggle').checked = false;
-        return await navigator.mediaDevices.getUserMedia({ video: videoConstraint, audio: false });
-      }
-      throw err;
-    }
-  }
-
-  // ---- shared: compact SDP encode/decode (manual mode) ----
-  function bufToBase64(buf){
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    const chunk = 0x8000;
-    for(let i = 0; i < bytes.length; i += chunk){
-      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-    }
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function base64ToBuf(b64){
-    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-    while(b64.length % 4) b64 += '=';
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
-  }
-  async function encodeDescription(desc){
-    const json = JSON.stringify(desc);
-    if(window.CompressionStream){
-      const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
-      const buf = await new Response(stream).arrayBuffer();
-      return 'gz:' + bufToBase64(buf);
-    }
-    return 'b64:' + bufToBase64(new TextEncoder().encode(json));
-  }
-  async function decodeDescription(text){
-    text = text.trim();
-    if(text.startsWith('gz:')){
-      const stream = new Blob([base64ToBuf(text.slice(3))]).stream().pipeThrough(new DecompressionStream('gzip'));
-      const json = await new Response(stream).text();
-      return JSON.parse(json);
-    }
-    if(text.startsWith('b64:')){
-      const json = new TextDecoder().decode(base64ToBuf(text.slice(4)));
-      return JSON.parse(json);
-    }
-    return JSON.parse(text);
-  }
-
-  // ---- OBS WebSocket relay (mode ①) ----
-  async function sha256base64(str){
-    const enc = new TextEncoder().encode(str);
-    const digest = await crypto.subtle.digest('SHA-256', enc);
-    return btoa(String.fromCharCode(...new Uint8Array(digest)));
-  }
-
-  function connectObs({host, port, pass}, handlers){
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const ws = new WebSocket('ws://' + host + ':' + port);
-      let reqCounter = 0;
-      const pending = new Map();
-
-      function send(requestType, requestData){
-        return new Promise((res, rej) => {
-          const requestId = 'r' + (++reqCounter);
-          pending.set(requestId, { res, rej });
-          ws.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData: requestData || {} } }));
-          setTimeout(() => {
-            if(pending.has(requestId)){ pending.delete(requestId); rej(new Error(requestType + ' timeout')); }
-          }, 8000);
-        });
-      }
-
-      ws.onmessage = async (evt) => {
-        let msg;
-        try{ msg = JSON.parse(evt.data); }catch(e){ return; }
-        const op = msg.op, d = msg.d || {};
-        if(op === 0){
-          let authentication;
-          if(d.authentication){
-            const secret = await sha256base64(pass + d.authentication.salt);
-            authentication = await sha256base64(secret + d.authentication.challenge);
-          }
-          ws.send(JSON.stringify({ op: 1, d: { rpcVersion: d.rpcVersion, authentication, eventSubscriptions: 1 } }));
-          return;
-        }
-        if(op === 2){
-          settled = true;
-          resolve({ send, ws });
-          if(handlers.onIdentified) handlers.onIdentified();
-          return;
-        }
-        if(op === 5){
-          if(d.eventType === 'CustomEvent' && handlers.onCustomEvent) handlers.onCustomEvent(d.eventData);
-          return;
-        }
-        if(op === 7){
-          const entry = pending.get(d.requestId);
-          if(entry){
-            pending.delete(d.requestId);
-            if(d.requestStatus && d.requestStatus.result) entry.res(d.responseData || {});
-            else entry.rej(new Error((d.requestStatus && d.requestStatus.comment) || 'request failed'));
-          }
-          return;
-        }
-      };
-      ws.onerror = () => { if(!settled) reject(new Error('WebSocket接続エラー')); };
-      ws.onclose = () => { if(handlers.onClose) handlers.onClose(); };
-    });
-  }
-
-  let obsSend = null;
-  let helloTimer = null;
-  const myId = Math.random().toString(36).slice(2);
-
-  async function handleObsCustomEvent(room, data){
-    if(!data) return;
-    if(data.kind === 'offer-sdp' && data.room === room && data.id === myId){
-      if(helloTimer){ clearInterval(helloTimer); helloTimer = null; }
-      try{
-        setStatus('相手が見つかりました。カメラを起動しています…');
-        const stream = await getCameraStream();
-        $('preview').srcObject = stream;
-
-        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        stream.getTracks().forEach(t => pc.addTrack(t, stream));
-
-        await pc.setRemoteDescription(data.sdp);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        setStatus('接続情報を送信しています…');
-        await waitIceComplete(pc);
-
-        await obsSend('BroadcastCustomEvent', { eventData: { kind: 'answer-sdp', room, id: myId, sdp: pc.localDescription } });
-        setStatus('接続しました。この画面を閉じずにそのままにしてください。', 'ok');
-      }catch(err){
-        setStatus('エラー: ' + err.message, 'error');
-      }
-    }
-  }
-
-  $('obsConnectBtn').addEventListener('click', async () => {
-    if(!window.isSecureContext){
-      setStatus('HTTPSで開かれていません。カメラ許可が出せません。', 'error');
-      return;
-    }
-    const host = $('obsHost').value.trim() || 'localhost';
-    const port = $('obsPort').value.trim() || '4455';
-    const pass = $('obsPass').value;
-    const room = $('roomCode').value.trim();
-    if(!room){
-      setStatus('合言葉(ルームコード)を入力してください。', 'error');
-      return;
-    }
-    $('obsConnectBtn').disabled = true;
-    setStatus('OBSに接続しています…');
-    try{
-      const { send } = await connectObs({ host, port, pass }, {
-        onCustomEvent: (data) => handleObsCustomEvent(room, data),
-        onClose: () => setStatus('OBSとの接続が切れました', 'error')
-      });
-      obsSend = send;
-      setStatus('「' + room + '」の相手を探しています…');
-      await obsSend('BroadcastCustomEvent', { eventData: { kind: 'hello', room, id: myId } });
-      helloTimer = setInterval(() => {
-        obsSend('BroadcastCustomEvent', { eventData: { kind: 'hello', room, id: myId } }).catch(() => {});
-      }, 3000);
-    }catch(err){
-      setStatus('OBS接続エラー: ' + err.message, 'error');
-      $('obsConnectBtn').disabled = false;
-    }
-  });
-
-  // ---- manual copy/paste mode (mode ②) ----
-  $('manualStartBtn').addEventListener('click', async () => {
+  $('startBtn').addEventListener('click', async () => {
     if(!window.isSecureContext){
       setStatus('HTTPSで開かれていません。カメラ許可が出せないため開き直してください。', 'error');
       return;
     }
-    $('manualStartBtn').disabled = true;
+    $('startBtn').disabled = true;
     setStatus('カメラを起動しています…');
     try{
-      const stream = await getCameraStream();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      });
       $('preview').srcObject = stream;
-      await listDevices();
 
       pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
@@ -383,11 +113,11 @@
       setStatus('接続情報を作成しています…');
       await waitIceComplete(pc);
 
-      $('offerOut').value = await encodeDescription(pc.localDescription);
-      setStatus('②のコード('+ $('offerOut').value.length +'文字)をコピーしてPC側に渡してください。', 'ok');
+      $('offerOut').value = JSON.stringify(pc.localDescription);
+      setStatus('②のコードをコピーしてPC側に渡してください。', 'ok');
     }catch(err){
       setStatus('カメラ起動に失敗しました: ' + err.message, 'error');
-      $('manualStartBtn').disabled = false;
+      $('startBtn').disabled = false;
     }
   });
 
@@ -404,7 +134,7 @@
       return;
     }
     try{
-      const answer = await decodeDescription($('answerIn').value);
+      const answer = JSON.parse($('answerIn').value.trim());
       await pc.setRemoteDescription(answer);
       setStatus('接続しました。この画面を閉じずにそのままにしてください。', 'ok');
     }catch(err){

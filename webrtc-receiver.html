@@ -12,42 +12,19 @@
     --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;
-    font-family:var(--sans);color:var(--text);}
-
-  #video{
-    position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000;
+  html,body{margin:0;background:var(--bg-deep);color:var(--text);font-family:var(--sans);}
+  body{padding:20px 16px 40px;max-width:520px;margin:0 auto;}
+  h1{font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--amber);margin:0 0 4px;}
+  video{
+    width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;
+    border:1px solid var(--border);object-fit:cover;margin-top:14px;
   }
-
-  #gearBtn{
-    position:fixed;top:12px;right:12px;z-index:5;
-    width:34px;height:34px;border-radius:50%;border:1px solid var(--border);
-    background:rgba(21,24,28,0.8);color:var(--text-dim);cursor:pointer;
-    font-size:15px;display:none;align-items:center;justify-content:center;
-  }
-  #gearBtn:hover{color:var(--amber);border-color:var(--amber);}
-
-  #setupPane{
-    position:fixed;inset:0;z-index:4;background:rgba(11,13,16,0.92);
-    display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;
-  }
-  #setupCard{
-    width:100%;max-width:480px;background:var(--panel);border:1px solid var(--border);
-    border-radius:10px;padding:22px 24px 26px;
-  }
-  h1{font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--amber);margin:0 0 16px;}
   label{
     display:block;font-family:var(--mono);font-size:11px;color:var(--text-dim);
     letter-spacing:.05em;margin:16px 0 6px;
   }
-  input[type="text"], input[type="password"], input[type="number"]{
-    width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text);
-    font-family:var(--mono);font-size:12.5px;padding:8px 10px;border-radius:5px;
-  }
-  .row2{display:flex;gap:8px;}
-  .row2 > div{flex:1;}
   textarea{
-    width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text);
+    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
     font-family:var(--mono);font-size:11px;border-radius:5px;padding:8px;resize:vertical;
   }
   button{
@@ -55,63 +32,28 @@
     padding:10px 16px;border-radius:5px;border:1px solid var(--tally-red);
     background:var(--tally-red);color:#fff;cursor:pointer;margin-top:10px;margin-right:6px;
   }
-  button.secondary{background:var(--bg-deep);border-color:var(--border);color:var(--text);}
-  button:disabled{opacity:.5;}
-  .tabs{display:flex;gap:6px;margin-bottom:4px;}
-  .tab{
-    font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
-    padding:8px 12px;border-radius:5px;border:1px solid var(--border);
-    background:var(--bg-deep);color:var(--text-dim);cursor:pointer;flex:1;text-align:center;
-  }
-  .tab.active{border-color:var(--amber);color:var(--amber);background:rgba(240,168,60,0.08);}
-  .pane{display:none;margin-top:14px;}
-  .pane.active{display:block;}
+  button.secondary{background:var(--panel);border-color:var(--border);color:var(--text);}
   #status{
-    font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:14px;line-height:1.6;
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:12px;line-height:1.6;
   }
   #status.error{color:var(--tally-red);}
   #status.ok{color:var(--amber);}
 </style>
 </head>
 <body>
+  <h1>WebRTC 受信(PC / OBS側)</h1>
+
+  <label>①スマホからもらったコードを貼り付け</label>
+  <textarea id="offerIn" rows="4" placeholder="スマホ側で生成されたコードを貼り付け"></textarea>
+  <button id="answerBtn" type="button">② 応答を作成</button>
+
+  <label>③スマホへ渡すコード</label>
+  <textarea id="answerOut" rows="4" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
+  <button id="copyAnswerBtn" type="button" class="secondary">コピー</button>
+
   <video id="video" autoplay playsinline></video>
-  <button id="gearBtn" title="設定を開く">⚙</button>
 
-  <div id="setupPane">
-    <div id="setupCard">
-      <h1>WebRTC 受信(PC / OBS側)</h1>
-
-      <div class="tabs">
-        <button type="button" class="tab active" data-pane="obsPane">① OBS経由(かんたん)</button>
-        <button type="button" class="tab" data-pane="manualPane">② 手動コピペ(サーバー不要)</button>
-      </div>
-
-      <div id="obsPane" class="pane active">
-        <label>OBSホスト</label>
-        <div class="row2">
-          <div><input type="text" id="obsHost" value="localhost" placeholder="host"></div>
-          <div><input type="number" id="obsPort" value="4455" placeholder="port"></div>
-        </div>
-        <label>OBS WebSocketパスワード(任意)</label>
-        <input type="password" id="obsPass" placeholder="パスワード">
-        <label>合言葉(ルームコード・送信側と同じ文字列)</label>
-        <input type="text" id="roomCode" placeholder="例: cam1">
-        <button id="obsConnectBtn" type="button">待ち受けを開始</button>
-      </div>
-
-      <div id="manualPane" class="pane">
-        <label>①スマホからもらったコードを貼り付け</label>
-        <textarea id="offerIn" rows="4" placeholder="スマホ側で生成されたコードを貼り付け"></textarea>
-        <button id="answerBtn" type="button">② 応答を作成</button>
-
-        <label>③スマホへ渡すコード</label>
-        <textarea id="answerOut" rows="4" readonly placeholder="「応答を作成」を押すと生成されます"></textarea>
-        <button id="copyAnswerBtn" type="button" class="secondary">コピー</button>
-      </div>
-
-      <div id="status">①のタブなら合言葉を決めて「待ち受けを開始」を押してください。</div>
-    </div>
-  </div>
+  <div id="status">スマホ側で先にカメラを開始し、コードを受け取ってから①に貼り付けてください。</div>
 
 <script>
 (function(){
@@ -138,201 +80,14 @@
     });
   }
 
-  function onVideoConnected(){
-    setStatus('映像を受信しました。このページをOBSのブラウザソースとして追加してください。', 'ok');
-    $('setupPane').style.display = 'none';
-    $('gearBtn').style.display = 'flex';
-  }
-
-  // ---- tab switching ----
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      $(tab.dataset.pane).classList.add('active');
-    });
-  });
-
-  $('gearBtn').addEventListener('click', () => {
-    const pane = $('setupPane');
-    const isOpen = pane.style.display === 'flex';
-    pane.style.display = isOpen ? 'none' : 'flex';
-  });
-
-  // ---- shared: compact SDP encode/decode (manual mode) ----
-  function bufToBase64(buf){
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    const chunk = 0x8000;
-    for(let i = 0; i < bytes.length; i += chunk){
-      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-    }
-    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function base64ToBuf(b64){
-    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-    while(b64.length % 4) b64 += '=';
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
-  }
-  async function encodeDescription(desc){
-    const json = JSON.stringify(desc);
-    if(window.CompressionStream){
-      const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
-      const buf = await new Response(stream).arrayBuffer();
-      return 'gz:' + bufToBase64(buf);
-    }
-    return 'b64:' + bufToBase64(new TextEncoder().encode(json));
-  }
-  async function decodeDescription(text){
-    text = text.trim();
-    if(text.startsWith('gz:')){
-      const stream = new Blob([base64ToBuf(text.slice(3))]).stream().pipeThrough(new DecompressionStream('gzip'));
-      const json = await new Response(stream).text();
-      return JSON.parse(json);
-    }
-    if(text.startsWith('b64:')){
-      const json = new TextDecoder().decode(base64ToBuf(text.slice(4)));
-      return JSON.parse(json);
-    }
-    return JSON.parse(text); // backward compatibility: plain JSON pasted directly
-  }
-
-  // ---- OBS WebSocket relay (mode ①) ----
-  async function sha256base64(str){
-    const enc = new TextEncoder().encode(str);
-    const digest = await crypto.subtle.digest('SHA-256', enc);
-    return btoa(String.fromCharCode(...new Uint8Array(digest)));
-  }
-
-  function connectObs({host, port, pass}, handlers){
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const ws = new WebSocket('ws://' + host + ':' + port);
-      let reqCounter = 0;
-      const pending = new Map();
-
-      function send(requestType, requestData){
-        return new Promise((res, rej) => {
-          const requestId = 'r' + (++reqCounter);
-          pending.set(requestId, { res, rej });
-          ws.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData: requestData || {} } }));
-          setTimeout(() => {
-            if(pending.has(requestId)){ pending.delete(requestId); rej(new Error(requestType + ' timeout')); }
-          }, 8000);
-        });
-      }
-
-      ws.onmessage = async (evt) => {
-        let msg;
-        try{ msg = JSON.parse(evt.data); }catch(e){ return; }
-        const op = msg.op, d = msg.d || {};
-        if(op === 0){
-          let authentication;
-          if(d.authentication){
-            const secret = await sha256base64(pass + d.authentication.salt);
-            authentication = await sha256base64(secret + d.authentication.challenge);
-          }
-          ws.send(JSON.stringify({ op: 1, d: { rpcVersion: d.rpcVersion, authentication, eventSubscriptions: 1 } }));
-          return;
-        }
-        if(op === 2){
-          settled = true;
-          resolve({ send, ws });
-          if(handlers.onIdentified) handlers.onIdentified();
-          return;
-        }
-        if(op === 5){
-          if(d.eventType === 'CustomEvent' && handlers.onCustomEvent) handlers.onCustomEvent(d.eventData);
-          return;
-        }
-        if(op === 7){
-          const entry = pending.get(d.requestId);
-          if(entry){
-            pending.delete(d.requestId);
-            if(d.requestStatus && d.requestStatus.result) entry.res(d.responseData || {});
-            else entry.rej(new Error((d.requestStatus && d.requestStatus.comment) || 'request failed'));
-          }
-          return;
-        }
-      };
-      ws.onerror = () => { if(!settled) reject(new Error('WebSocket接続エラー')); };
-      ws.onclose = () => { if(handlers.onClose) handlers.onClose(); };
-    });
-  }
-
-  let obsSend = null;
-  let pendingSenderId = null;
-
-  async function handleObsCustomEvent(room, data){
-    if(!data) return;
-    if(data.kind === 'hello' && data.room === room){
-      try{
-        pendingSenderId = data.id;
-        setStatus('相手(合言葉「' + room + '」)が見つかりました。接続情報を作成しています…');
-        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        pc.ontrack = (e) => {
-          $('video').srcObject = e.streams[0];
-          onVideoConnected();
-        };
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await waitIceComplete(pc);
-
-        await obsSend('BroadcastCustomEvent', { eventData: { kind: 'offer-sdp', room, id: data.id, sdp: pc.localDescription } });
-        setStatus('相手からの応答を待っています…');
-      }catch(err){
-        setStatus('エラー: ' + err.message, 'error');
-      }
-    }
-    if(data.kind === 'answer-sdp' && data.room === room && data.id === pendingSenderId && pc){
-      try{
-        await pc.setRemoteDescription(data.sdp);
-      }catch(err){
-        setStatus('接続エラー: ' + err.message, 'error');
-      }
-    }
-  }
-
-  $('obsConnectBtn').addEventListener('click', async () => {
-    const host = $('obsHost').value.trim() || 'localhost';
-    const port = $('obsPort').value.trim() || '4455';
-    const pass = $('obsPass').value;
-    const room = $('roomCode').value.trim();
-    if(!room){
-      setStatus('合言葉(ルームコード)を入力してください。', 'error');
-      return;
-    }
-    $('obsConnectBtn').disabled = true;
-    setStatus('OBSに接続しています…');
-    try{
-      const { send } = await connectObs({ host, port, pass }, {
-        onCustomEvent: (data) => handleObsCustomEvent(room, data),
-        onClose: () => setStatus('OBSとの接続が切れました', 'error')
-      });
-      obsSend = send;
-      setStatus('「' + room + '」で送信側を待っています…');
-    }catch(err){
-      setStatus('OBS接続エラー: ' + err.message, 'error');
-      $('obsConnectBtn').disabled = false;
-    }
-  });
-
-  // ---- manual copy/paste mode (mode ②) ----
   $('answerBtn').addEventListener('click', async () => {
     try{
-      const offer = await decodeDescription($('offerIn').value);
+      const offer = JSON.parse($('offerIn').value.trim());
 
       pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
       pc.ontrack = (e) => {
         $('video').srcObject = e.streams[0];
-        onVideoConnected();
+        setStatus('映像を受信しました。このページをOBSのブラウザソースとして追加してください。', 'ok');
       };
 
       await pc.setRemoteDescription(offer);
@@ -341,8 +96,8 @@
       setStatus('応答を作成しています…');
       await waitIceComplete(pc);
 
-      $('answerOut').value = await encodeDescription(pc.localDescription);
-      setStatus('③のコード('+ $('answerOut').value.length +'文字)をコピーしてスマホ側に渡してください。');
+      $('answerOut').value = JSON.stringify(pc.localDescription);
+      setStatus('③のコードをコピーしてスマホ側に渡してください。');
     }catch(err){
       setStatus('コードの読み込みに失敗しました。スマホ側のコードをそのまま貼り付けてください。(' + err.message + ')', 'error');
     }
